@@ -474,8 +474,7 @@
                           <div class="flex gap-3 items-center">
                               <button onclick="cerrarEditorDoc()" class="text-white/70 hover:text-white text-[10px] font-bold uppercase transition-colors">Cancelar</button>
                               <div class="w-px h-4 bg-white/20"></div>
-                              <button onclick="verPreview()" class="bg-white text-[#008395] px-3 py-1.5 rounded shadow-sm text-[10px] font-bold uppercase hover:bg-slate-100 flex items-center gap-1 transition-colors"><i data-lucide="eye" class="w-3 h-3"></i> Previsualizar</button>
-                          </div>
+                              <button id="btn-previsualizar-doc" onclick="verPreview()" class="bg-white text-[#008395] px-3 py-1.5 rounded shadow-sm text-[10px] font-bold uppercase hover:bg-slate-100 flex items-center gap-1 transition-colors"><i data-lucide="eye" class="w-3 h-3"></i> Previsualizar</button>                          </div>
                       </div>
                       
                       <div class="flex gap-2 p-2 bg-slate-50 border-b border-slate-200">
@@ -522,7 +521,9 @@
                 <img src="https://lh3.googleusercontent.com/d/1C7xmXsJvnfA_bX_HF6BvSojlDigIw8g5" alt="HaceClick.ai" class="h-8 md:h-10 object-contain grayscale hover:grayscale-0 transition-all">
             </a>
         </div>
-
+      
+    <input type="file" id="file-upload-propio" class="hidden" accept="application/pdf" onchange="handleUploadPropio(event)">
+      
     </main>
 
 <script>
@@ -1626,6 +1627,7 @@
       CACHE_DATA.pacientes.forEach((p, idx) => {
           if (prestadorSeleccionado && prestadorSeleccionado !== "TODOS" && p.prestador !== prestadorSeleccionado) return;
           
+          // NO filtramos las Obras Sociales aquí, todos deben poder ver sus pacientes y generar textos
           let nombreLimpio = p.paciente.trim().toUpperCase();
           if (!nombresVistos.has(nombreLimpio)) {
               nombresVistos.add(nombreLimpio);
@@ -1675,10 +1677,9 @@
 
           let partesOS = p.paciente.split('_');
           let osDelPaciente = partesOS.length > 1 ? partesOS[partesOS.length - 1].trim().toUpperCase() : 'PARTICULAR';
+          let statusOS = CACHE_DATA.osConfig ? (CACHE_DATA.osConfig[osDelPaciente] || 'SI') : 'SI';
           
-          if (CACHE_DATA.osHabilitadas) {
-              if (!CACHE_DATA.osHabilitadas.includes(osDelPaciente)) return; 
-          }
+          if (statusOS === 'NO') return; // Ocultamos los que no llevan informe
 
           let nombreLimpio = p.paciente.trim().toUpperCase();
           if (pVistos.has(nombreLimpio)) return;
@@ -1686,24 +1687,38 @@
 
           const inf = informesMap[p.paciente];
           const tieneInforme = !!inf;
-          
           if (VER_SOLO_PENDIENTES && tieneInforme) return;
 
           let statusHtml = '';
-          if (tieneInforme) {
-              statusHtml = `
-                <div class="flex items-center justify-center gap-2">
-                    <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold border border-green-300">SÍ</span>
-                    <button onclick="abrirCarpetaInformesDirecta('${p.idDrive}', '${p.paciente}')" 
-                            class="p-1 text-[#008395] hover:bg-teal-50 rounded transition-colors" 
-                            title="Ver Informes de este Semestre">
-                        <i data-lucide="folder-search" class="w-4 h-4"></i>
-                    </button>
-                </div>`;
-          } else {
-              statusHtml = `<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold border border-red-300">NO</span>`;
-          }
           
+          if (statusOS === 'PROPIO') {
+              if (tieneInforme) {
+                  statusHtml = `
+                  <div class="flex items-center justify-center gap-2">
+                      <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-300">ENTREGADO</span>
+                      <button onclick="abrirCarpetaInformesDirecta('${p.idDrive}', '${p.paciente}')" class="p-1 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Ver Informe Especial"><i data-lucide="folder-search" class="w-4 h-4"></i></button>
+                  </div>`;
+              } else {
+                  statusHtml = `
+                  <div class="flex items-center justify-center gap-2">
+                      <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold border border-orange-300">PROPIO</span>
+                      <button onclick="triggerUploadPropio('${p.paciente}', '${p.idDrive}', '${p.prestador}')" class="p-1 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Subir PDF Especial Terminado"><i data-lucide="upload-cloud" class="w-4 h-4"></i></button>
+                      <button onclick="abrirModelosEspeciales()" class="p-1 text-orange-500 hover:bg-orange-50 rounded transition-colors" title="Descargar Modelo"><i data-lucide="file-template" class="w-4 h-4"></i></button>
+                  </div>`;
+              }
+          } else {
+              // Flujo NORMAL (SI)
+              if (tieneInforme) {
+                  statusHtml = `
+                  <div class="flex items-center justify-center gap-2">
+                      <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold border border-green-300">SÍ</span>
+                      <button onclick="abrirCarpetaInformesDirecta('${p.idDrive}', '${p.paciente}')" class="p-1 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Ver Informe"><i data-lucide="folder-search" class="w-4 h-4"></i></button>
+                  </div>`;
+              } else {
+                  statusHtml = `<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold border border-red-300">NO</span>`;
+              }
+          }
+
           const fecha = tieneInforme ? inf.fecha : '-';
 
           rows += `<tr class="hover:bg-slate-50 border-b border-gray-100 transition-colors">
@@ -1714,9 +1729,8 @@
           </tr>`;
       });
 
-      if (!rows) rows = '<tr><td colspan="4" class="text-center py-8 text-gray-400 text-xs">No hay pacientes con informes obligatorios pendientes.</td></tr>';
+      if (!rows) rows = '<tr><td colspan="4" class="text-center py-8 text-gray-400 text-xs">No hay pacientes con informes pendientes.</td></tr>';
       tbody.innerHTML = rows;
-      
       if(window.lucide) lucide.createIcons();
   }
 
@@ -1798,11 +1812,23 @@
               else if(tLower.includes("musicoterap")) finalEspecialidad = "Musicoterapia";
           }
       }
+
+      // --- ALERTA Y BLOQUEO PARA OS "PROPIO" ---
+      let partesOS = p.paciente.split('_');
+      let osDelPaciente = partesOS.length > 1 ? partesOS[partesOS.length - 1].trim().toUpperCase() : 'PARTICULAR';
+      let statusOS = CACHE_DATA.osConfig ? (CACHE_DATA.osConfig[osDelPaciente] || 'SI') : 'SI';
+
+      const btnPrev = document.getElementById('btn-previsualizar-doc');
+      if (statusOS === 'PROPIO') {
+          showToast("⚠️ OS con modelo propio. Copia este borrador, pero el PDF debe subirse manual desde la tabla de abajo.", "warning");
+          if(btnPrev) btnPrev.classList.add('hidden'); // Oculta el botón de guardar
+      } else {
+          if(btnPrev) btnPrev.classList.remove('hidden');
+      }
       
       let aprobadoVal = String(p.aprobado || "");
       let mesInicioRaw = aprobadoVal.includes('/') ? aprobadoVal.split('/')[0].trim() : aprobadoVal.trim();
       let mesInicio = formatearPeriodo(mesInicioRaw);
-      
       let isPrimerSem = (new Date().getMonth() + 1) <= 6;
       let mesFin = (isPrimerSem ? "Junio " : "Diciembre ") + new Date().getFullYear();
       periodoEvaluadoGlobal = `${mesInicio} a ${mesFin}`;
@@ -2037,7 +2063,93 @@
           showBrowserError("No se pudo cargar la carpeta: " + err.message);
       });
   }
+// --- LÓGICA PARA SUBIR INFORMES "PROPIOS" ---
+  let UPLOAD_PROPIO_DATA = null;
 
+  function triggerUploadPropio(paciente, idDrive, prestador) {
+      if(!idDrive || idDrive.length < 5) return showToast("El paciente no tiene carpeta de Drive vinculada.", "error");
+      
+      let finalEspecialidad = CACHE_DATA.currentUserInfo.especialidad || "General";
+      if (CACHE_DATA.isAdmin && prestador) {
+           const info = CACHE_DATA.prestadoresInfo[prestador];
+           if(info && info.titulo) {
+                const tLower = info.titulo.toLowerCase();
+                if(tLower.includes("psicopedagog")) finalEspecialidad = "Psicopedagogía";
+                else if(tLower.includes("ocupacional") || tLower.includes("terapista")) finalEspecialidad = "Terapia Ocupacional";
+                else if(tLower.includes("fonoaudiolog")) finalEspecialidad = "Fonoaudiología";
+                else if(tLower.includes("psicolog")) finalEspecialidad = "Psicología";
+                else if(tLower.includes("musicoterap")) finalEspecialidad = "Musicoterapia";
+           }
+      }
+      
+      UPLOAD_PROPIO_DATA = { paciente, idDrive, prestador, especialidad: finalEspecialidad };
+      document.getElementById('file-upload-propio').click();
+  }
+
+  function handleUploadPropio(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (file.type !== "application/pdf") {
+           showToast("Solo se permiten archivos PDF.", "error");
+           document.getElementById('file-upload-propio').value = ''; return;
+      }
+      if (file.size > 5242880) {
+          showToast("El archivo es muy pesado (Máximo 5MB)", "error");
+          document.getElementById('file-upload-propio').value = ''; return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+          const payload = {
+              paciente: UPLOAD_PROPIO_DATA.paciente,
+              idDrive: UPLOAD_PROPIO_DATA.idDrive,
+              prestador: UPLOAD_PROPIO_DATA.prestador,
+              especialidad: UPLOAD_PROPIO_DATA.especialidad,
+              fileName: `Informe_${UPLOAD_PROPIO_DATA.paciente.replace(/\s+/g, '_')}_Especial.pdf`,
+              mimeType: file.type,
+              base64Data: e.target.result
+          };
+
+          showToast("Subiendo PDF especial a Drive...", "success");
+
+          llamarBackend('subirInformePropio', [payload], function(res) {
+              document.getElementById('file-upload-propio').value = ''; 
+              if(res.success) {
+                  showToast("Informe Especial subido y guardado", "success");
+                  if (!CACHE_DATA.documentosClinicos) CACHE_DATA.documentosClinicos = [];
+                  CACHE_DATA.documentosClinicos.push(res.doc);
+                  renderControlInformes();
+              } else showToast("Error: " + res.error, "error");
+          }, function(err) {
+              document.getElementById('file-upload-propio').value = '';
+              showToast("Error de conexión: " + err.message, "error");
+          });
+      };
+      reader.readAsDataURL(file);
+  }
+
+  function abrirModelosEspeciales() {
+      const idInstructivos = CACHE_DATA.carpetas.instructivos;
+      if(!idInstructivos) return showToast("La carpeta de instructivos no está configurada.", "error");
+      
+      document.querySelectorAll('.view-div').forEach(function(v) { v.classList.add('hidden'); });
+      document.getElementById('view-browser').classList.remove('hidden');
+      document.getElementById('browser-title').innerText = "Modelos Informe Especiales";
+      
+      EXIT_VIEW = 'docclinica';
+      NAV_HISTORY = [{ id: idInstructivos, canEdit: false }];
+      IS_LIST_VIEW = true; 
+      IS_DOCUMENTACION_PERSONAL = false;
+      
+      const icon = document.getElementById('icon-view-mode');
+      if(icon) icon.setAttribute('data-lucide', 'layout-grid');
+
+      resetBrowser();
+      llamarBackend('getSubfolderContents', [idInstructivos, 'Modelos_Informe_Especiales'], onFilesFetched, function(err) {
+          showBrowserError("No se pudo cargar la carpeta (verifica que exista en Instructivos): " + err.message);
+      });
+  }
+  
 </script>
 </body>
 </html>
