@@ -534,23 +534,27 @@
   function cerrarModalConfirm() { document.getElementById('modal-confirm').classList.add('hidden'); accionConfirmada = null; }
   function ejecutarAccionConfirmada() { if (accionConfirmada) accionConfirmada(); cerrarModalConfirm(); }
 
+  // 3. EL NUEVO ARRANQUE DE LA APP (SISTEMA HÍBRIDO DE SEGURIDAD)
   window.onload = function() {
     if(typeof lucide !== 'undefined') lucide.createIcons();
     
-    // Verificamos si el objeto google existe antes de usarlo
-    if (typeof google !== 'undefined' && google.script) {
-        google.script.url.getLocation(function(location) {
-            let token = location.parameter.uid || "";
-            USER_EMAIL_GLOBAL = token.trim();
-            google.script.run.withSuccessHandler(initApp).withFailureHandler(showError).getAppData(USER_EMAIL_GLOBAL); 
-        });
+    const urlParams = new URLSearchParams(window.location.search);
+    const uidFromUrl = urlParams.get('uid');
+    
+    if (uidFromUrl) {
+        localStorage.setItem('haceclick_vip_token', uidFromUrl);
+        window.history.replaceState({}, document.title, window.location.pathname); // Esto oculta el token
+        USER_EMAIL_GLOBAL = uidFromUrl;
+        llamarBackend('getAppData', [USER_EMAIL_GLOBAL], initApp, showError);
+        
     } else {
-        // Si no existe, es porque se abrió fuera de Google
-        document.getElementById('loader').innerHTML = `
-            <div class="text-center p-10">
-                <p class="text-red-500 font-bold">Error de Entorno</p>
-                <p class="text-xs text-gray-500">Esta App solo funciona ejecutada desde Google Apps Script.</p>
-            </div>`;
+        const savedToken = localStorage.getItem('haceclick_vip_token');
+        if (savedToken) {
+            USER_EMAIL_GLOBAL = savedToken;
+            llamarBackend('getAppData', [USER_EMAIL_GLOBAL], initApp, showError);
+        } else {
+            window.location.href = "https://www.haceclick-ai.com/acceso-clientes";
+        }
     }
   };
 
@@ -558,29 +562,34 @@
     CACHE_DATA = data;
     document.getElementById('loader').classList.add('hidden');
     
-    if(document.getElementById('user-email')) document.getElementById('user-email').innerText = data.userDisplayName || data.user;
-    if(document.getElementById('user-role')) document.getElementById('user-role').innerText = data.role;
-    if(document.getElementById('user-title') && data.currentUserInfo.titulo) document.getElementById('user-title').innerText = data.currentUserInfo.titulo;
+    const userEl = document.getElementById('user-email'); 
+    if(userEl) userEl.innerText = data.userDisplayName || data.user;
+    const roleEl = document.getElementById('user-role'); 
+    if(roleEl) roleEl.innerText = data.role;
+    
+    const titleEl = document.getElementById('user-title');
+    if(titleEl && data.currentUserInfo && data.currentUserInfo.titulo) {
+        titleEl.innerText = data.currentUserInfo.titulo;
+    }
     
     if(data.isAdmin) {
       document.getElementById('admin-sync-btn').classList.remove('hidden');
       document.getElementById('btn-add-notif').classList.remove('hidden');
       
-      document.getElementById('div-admin-prestador').classList.remove('hidden');
       const sAdmin = document.getElementById('doc-admin-prestador');
-      const prestadoresUnicos = [...new Set(data.pacientes.map(p => p.prestador))].filter(Boolean).sort();
-      prestadoresUnicos.forEach(pr => { sAdmin.innerHTML += `<option value="${pr}">${pr}</option>`; });
+      if (sAdmin) {
+          const prestadoresUnicos = [...new Set(data.pacientes.map(p => p.prestador))].filter(Boolean).sort();
+          prestadoresUnicos.forEach(pr => { sAdmin.innerHTML += `<option value="${pr}">${pr}</option>`; });
+      }
     } else {
-      // Ocultar botón de Editar Plantilla a los terapeutas normales
       const btnEditarPlan = document.getElementById('btn-editar-plantilla');
       if(btnEditarPlan) btnEditarPlan.classList.add('hidden');
 
-      // NUEVO: Bloquear el Tipo de Documento fijo en "Informe"
       const selectTipoDoc = document.getElementById('doc-tipo');
       if (selectTipoDoc) {
-          selectTipoDoc.value = "Informe"; // Lo fuerza a Informe
-          selectTipoDoc.disabled = true; // Lo bloquea para que no se pueda desplegar
-          selectTipoDoc.classList.add('bg-slate-100', 'text-slate-500', 'cursor-not-allowed'); // Lo pinta de gris
+          selectTipoDoc.value = "Informe"; 
+          selectTipoDoc.disabled = true; 
+          selectTipoDoc.classList.add('bg-slate-100', 'text-slate-500', 'cursor-not-allowed'); 
       }
     }
     
@@ -589,14 +598,23 @@
     renderFacturasTable();
 
     // Seteo Fecha por defecto (Doc Clínica)
-    const today = new Date();
-    const isPrimer = (today.getMonth() + 1) <= 6;
-    const defYear = today.getFullYear();
-    document.getElementById('doc-fecha').value = isPrimer ? `${defYear}-06-30` : `${defYear}-12-31`;
+    const docFecha = document.getElementById('doc-fecha');
+    if(docFecha) {
+        const today = new Date();
+        const isPrimer = (today.getMonth() + 1) <= 6;
+        docFecha.value = isPrimer ? `${today.getFullYear()}-06-30` : `${today.getFullYear()}-12-31`;
+    }
 
     cargarPacientesDoc();
-    renderControlInformes();
-    google.script.run.withSuccessHandler(function(ts) { misTemplates = ts; }).getTemplates(data.currentUserInfo.nombre);
+    
+    // TRADUCCIÓN: Pedimos los templates usando tu backend
+    llamarBackend('getTemplates', [data.currentUserInfo.nombre], function(ts) { misTemplates = ts; });
+
+    setInterval(function() {
+        if (!document.getElementById('view-dashboard').classList.contains('hidden')) {
+            refreshNotifsSilent();
+        }
+    }, 10000);
   }
 
   setInterval(function() { if (!document.getElementById('view-dashboard').classList.contains('hidden')) refreshNotifsSilent(); }, 10000);
@@ -1025,22 +1043,24 @@
 
       if(docModoEdicion === 'template') {
           const tipo = document.getElementById('doc-tipo').value;
-          
-          // Determinamos qué especialidad estamos guardando
           let especialidadAGuardar = finalEspecialidad;
           if (CACHE_DATA.isAdmin) {
               especialidadAGuardar = document.getElementById('doc-template-especialidad').value;
           }
           
-          google.script.run.withSuccessHandler(res => {
+          // TRADUCCIÓN: Guardar Plantilla
+          llamarBackend('guardarTemplate', [finalPrestador, tipo, especialidadAGuardar, html], function(res) {
               btn.disabled = false; btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Confirmar y Guardar`;
               document.getElementById('modal-preview').classList.add('hidden');
-              document.getElementById('div-admin-especialidad-template').classList.add('hidden'); // Ocultamos el selector
+              document.getElementById('div-admin-especialidad-template').classList.add('hidden');
               cerrarEditorDoc(); 
               showToast("Plantilla de " + especialidadAGuardar + " guardada", "success");
               
-              google.script.run.withSuccessHandler(ts => misTemplates = ts).getTemplates(finalPrestador);
-          }).guardarTemplate(finalPrestador, tipo, especialidadAGuardar, html);
+              llamarBackend('getTemplates', [finalPrestador], function(ts) { misTemplates = ts; });
+          }, function(err) {
+              btn.disabled = false; btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Confirmar y Guardar`;
+              showToast("Error al guardar: " + err.message, "error");
+          });
           
       } else {
           const p = CACHE_DATA.pacientes[document.getElementById('doc-paciente').value];
@@ -1065,7 +1085,8 @@
               fechaDoc: fechaDocFinal
           };
           
-          google.script.run.withSuccessHandler(res => {
+          // TRADUCCIÓN: Guardar PDF
+          llamarBackend('guardarDocumentoClinico', [payload], function(res) {
               btn.disabled = false; btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Confirmar y Guardar`;
               document.getElementById('modal-preview').classList.add('hidden');
               cerrarEditorDoc();
@@ -1075,9 +1096,13 @@
                   if (!CACHE_DATA.documentosClinicos) CACHE_DATA.documentosClinicos = [];
                   CACHE_DATA.documentosClinicos.push(res.doc);
                   renderControlInformes();
-              } 
-              else showToast("Error: " + res.error, "error");
-          }).guardarDocumentoClinico(payload);
+              } else {
+                  showToast("Error: " + res.error, "error");
+              }
+          }, function(err) {
+              btn.disabled = false; btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Confirmar y Guardar`;
+              showToast("Error al guardar: " + err.message, "error");
+          });
       }
   }
 
@@ -1221,29 +1246,32 @@
       }).guardarConfigOS(seleccionadas);
   }
 
-  // --- NAVEGACIÓN DIRECTA A CARPETA DE INFORMES SEMESTRALES ---
+ // --- NAVEGACIÓN DIRECTA A CARPETA DE INFORMES SEMESTRALES ---
   function abrirCarpetaInformesDirecta(idRoot, pacienteNombre) {
       const anioActual = new Date().getFullYear();
       const isPrimerSemestre = (new Date().getMonth() + 1) <= 6;
       const nombreSemestre = isPrimerSemestre ? "Informes_semestrales_Junio" : "Informes_semestrales_Diciembre";
       
-      // Construimos la ruta: "2026/Informes_semestrales_Junio"
       const rutaSubcarpeta = anioActual + "/" + nombreSemestre;
 
-      // Cambiamos a la vista del buscador
       document.querySelectorAll('.view-div').forEach(function(v) { v.classList.add('hidden'); });
       document.getElementById('view-browser').classList.remove('hidden');
       document.getElementById('browser-title').innerText = "Informes " + (isPrimerSemestre ? "Junio" : "Diciembre") + ": " + pacienteNombre;
       
-      // Configuramos el historial para que el botón "Atrás" funcione
-      IS_LIST_VIEW = true;
       EXIT_VIEW = 'docclinica';
-      NAV_HISTORY = [idRoot]; 
+      NAV_HISTORY = [{ id: idRoot, canEdit: false }]; // Respetamos tu sistema de historial
       CURRENT_FOLDER_ID = idRoot;
+      IS_LIST_VIEW = true; 
+      
+      const icon = document.getElementById('icon-view-mode');
+      if(icon) icon.setAttribute('data-lucide', 'layout-grid');
 
-      // Solicitamos el contenido de la subcarpeta específica
       resetBrowser();
-      google.script.run.withSuccessHandler(onFilesFetched).getSubfolderContents(idRoot, rutaSubcarpeta);
+      
+      // TRADUCCIÓN: Llamamos al backend para abrir subcarpetas
+      llamarBackend('getSubfolderContents', [idRoot, rutaSubcarpeta], onFilesFetched, function(err) {
+          showBrowserError("No se pudo cargar la carpeta: " + err.message);
+      });
   }
 </script>
 </body>
