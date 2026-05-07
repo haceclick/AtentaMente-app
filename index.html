@@ -1928,7 +1928,7 @@
               matricula: finalMatricula,
               periodo: periodoEvaluadoGlobal,
               firmaUrl: finalFirmaUrl,
-              fechaDoc: fechaDocFinal
+              fechaDoc: new Date().toLocaleDateString('es-AR')
           };
           
           llamarBackend('guardarDocumentoClinico', [payload], function(res) {
