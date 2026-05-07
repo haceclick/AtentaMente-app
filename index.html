@@ -536,11 +536,22 @@
 
   window.onload = function() {
     if(typeof lucide !== 'undefined') lucide.createIcons();
-    google.script.url.getLocation(function(location) {
-        let token = location.parameter.uid || "";
-        USER_EMAIL_GLOBAL = token.trim();
-        google.script.run.withSuccessHandler(initApp).withFailureHandler(showError).getAppData(USER_EMAIL_GLOBAL); 
-    });
+    
+    // Verificamos si el objeto google existe antes de usarlo
+    if (typeof google !== 'undefined' && google.script) {
+        google.script.url.getLocation(function(location) {
+            let token = location.parameter.uid || "";
+            USER_EMAIL_GLOBAL = token.trim();
+            google.script.run.withSuccessHandler(initApp).withFailureHandler(showError).getAppData(USER_EMAIL_GLOBAL); 
+        });
+    } else {
+        // Si no existe, es porque se abrió fuera de Google
+        document.getElementById('loader').innerHTML = `
+            <div class="text-center p-10">
+                <p class="text-red-500 font-bold">Error de Entorno</p>
+                <p class="text-xs text-gray-500">Esta App solo funciona ejecutada desde Google Apps Script.</p>
+            </div>`;
+    }
   };
 
   function initApp(data) {
