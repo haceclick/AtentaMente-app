@@ -1077,9 +1077,7 @@
           showToast("El paciente no tiene ID de Drive válido.", "error");
       }
   }
-
-  function openHCFromIndex(index) {
-  
+ 
   function openHCFromIndex(index) { 
       const p = CACHE_DATA.pacientes[index]; 
       if(p) openHC(p.paciente, p.dni, p.afiliado, p.dx, p.telefono, p.prestador, p.prestadorTitulo, p.idDrive); 
