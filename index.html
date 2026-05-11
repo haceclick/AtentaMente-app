@@ -505,7 +505,14 @@
               <div class="p-0 overflow-y-auto max-h-[500px]">
                   <table class="w-full text-left text-xs">
                       <thead class="bg-gray-50 text-[10px] uppercase text-gray-500 border-b border-slate-200">
-                          <tr><th class="px-5 py-3">Paciente</th><th class="px-5 py-3">Prestador</th><th class="px-5 py-3 text-center">¿Tiene Informe?</th><th class="px-5 py-3">Última Fecha</th></tr>
+                          <tr>
+                              <th class="px-5 py-3">Paciente</th>
+                              <th class="px-5 py-3">Prestador</th>
+                              <th class="px-5 py-3 text-center">Estado</th>
+                              <th class="px-5 py-3 text-center">Última Fecha</th>
+                              <th class="px-5 py-3 text-center">Inf. Anterior</th>
+                              <th class="px-5 py-3 text-center">Acciones</th>
+                          </tr>
                       </thead>
                       <tbody id="tbody-control-informes" class="divide-y divide-gray-100"></tbody>
                   </table>
@@ -1698,46 +1705,47 @@
           const tieneInforme = !!inf;
           if (VER_SOLO_PENDIENTES && tieneInforme) return;
 
-          let statusHtml = '';
+          let statusLabel = '';
+          let actionHtml = '-';
           
+          // Lógica de separación: Etiqueta vs Botones
           if (statusOS === 'PROPIO') {
               if (tieneInforme) {
-                  statusHtml = `
-                  <div class="flex items-center justify-center gap-2">
-                      <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-300">ENTREGADO</span>
-                      <button onclick="abrirCarpetaInformesDirecta('${p.idDrive}', '${p.paciente}')" class="p-1 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Ver Informe Especial"><i data-lucide="folder-search" class="w-4 h-4"></i></button>
-                  </div>`;
+                  statusLabel = `<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-300">ENTREGADO</span>`;
+                  actionHtml = `<button onclick="abrirCarpetaInformesDirecta('${p.idDrive}', '${p.paciente}')" class="p-1.5 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Ver Informe Especial"><i data-lucide="folder-search" class="w-4 h-4"></i></button>`;
               } else {
-                  statusHtml = `
-                  <div class="flex items-center justify-center gap-2">
-                      <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold border border-orange-300">PROPIO</span>
-                      <button onclick="triggerUploadPropio('${p.paciente}', '${p.idDrive}', '${p.prestador}')" class="p-1 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Subir PDF Especial Terminado"><i data-lucide="upload-cloud" class="w-4 h-4"></i></button>
-                      <button onclick="abrirModelosEspeciales()" class="p-1 text-orange-500 hover:bg-orange-50 rounded transition-colors" title="Ver Modelos de Informes Especiales"><i data-lucide="file-type-2" class="w-4 h-4"></i></button>
+                  statusLabel = `<span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold border border-orange-300">PROPIO</span>`;
+                  actionHtml = `
+                  <div class="flex items-center justify-center gap-1">
+                      <button onclick="triggerUploadPropio('${p.paciente}', '${p.idDrive}', '${p.prestador}')" class="p-1.5 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Subir PDF Especial Terminado"><i data-lucide="upload-cloud" class="w-4 h-4"></i></button>
+                      <button onclick="abrirModelosEspeciales()" class="p-1.5 text-orange-500 hover:bg-orange-50 rounded transition-colors" title="Ver Modelos de Informes Especiales"><i data-lucide="file-type-2" class="w-4 h-4"></i></button>
                   </div>`;
               }
           } else {
               if (tieneInforme) {
-                  statusHtml = `
-                  <div class="flex items-center justify-center gap-2">
-                      <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold border border-green-300">SÍ</span>
-                      <button onclick="abrirCarpetaInformesDirecta('${p.idDrive}', '${p.paciente}')" class="p-1 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Ver Informe"><i data-lucide="folder-search" class="w-4 h-4"></i></button>
-                  </div>`;
+                  statusLabel = `<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold border border-green-300">SÍ</span>`;
+                  actionHtml = `<button onclick="abrirCarpetaInformesDirecta('${p.idDrive}', '${p.paciente}')" class="p-1.5 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Ver Informe"><i data-lucide="folder-search" class="w-4 h-4"></i></button>`;
               } else {
-                  statusHtml = `<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold border border-red-300">NO</span>`;
+                  statusLabel = `<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold border border-red-300">NO</span>`;
               }
           }
 
           const fecha = tieneInforme ? inf.fecha : '-';
+          
+          // Botón fijo para el Informe Anterior
+          const btnAnterior = `<button onclick="abrirInformeAnterior('${p.idDrive}', '${p.paciente}')" class="p-1.5 text-gray-500 hover:text-[#008395] hover:bg-gray-100 rounded transition-colors" title="Ver Informe Dic 2025"><i data-lucide="history" class="w-4 h-4"></i></button>`;
 
           rows += `<tr class="hover:bg-slate-50 border-b border-gray-100 transition-colors">
               <td class="px-5 py-3 font-bold text-gray-700 text-xs">${p.paciente}</td>
               <td class="px-5 py-3 text-[10px] text-gray-500">${p.prestador}</td>
-              <td class="px-5 py-3 text-center">${statusHtml}</td>
-              <td class="px-5 py-3 text-xs text-gray-600">${fecha}</td>
+              <td class="px-5 py-3 text-center">${statusLabel}</td>
+              <td class="px-5 py-3 text-center text-xs text-gray-600">${fecha}</td>
+              <td class="px-5 py-3 text-center">${btnAnterior}</td>
+              <td class="px-5 py-3 text-center">${actionHtml}</td>
           </tr>`;
       });
 
-      if (!rows) rows = '<tr><td colspan="4" class="text-center py-8 text-gray-400 text-xs">No hay pacientes con informes pendientes.</td></tr>';
+      if (!rows) rows = '<tr><td colspan="6" class="text-center py-8 text-gray-400 text-xs">No hay pacientes con informes pendientes.</td></tr>';
       tbody.innerHTML = rows;
       if(window.lucide) lucide.createIcons();
   }
@@ -2168,6 +2176,32 @@
           }
       }, function(err) {
           showBrowserError("Error de conexión: " + err.message);
+      });
+  }
+
+  function abrirInformeAnterior(idRoot, pacienteNombre) {
+      if(!idRoot || idRoot.length < 5) return showToast("El paciente no tiene carpeta de Drive vinculada.", "error");
+
+      document.querySelectorAll('.view-div').forEach(function(v) { v.classList.add('hidden'); });
+      document.getElementById('view-browser').classList.remove('hidden');
+      document.getElementById('browser-title').innerText = "Informe Dic 2025: " + pacienteNombre;
+      
+      EXIT_VIEW = 'docclinica';
+      NAV_HISTORY = [{ id: idRoot, canEdit: false }]; 
+      CURRENT_FOLDER_ID = idRoot;
+      IS_LIST_VIEW = true; 
+      IS_DOCUMENTACION_PERSONAL = false;
+      
+      const icon = document.getElementById('icon-view-mode');
+      if(icon) icon.setAttribute('data-lucide', 'layout-grid');
+
+      resetBrowser();
+      
+      // Búsqueda directa en la subcarpeta del año pasado
+      const rutaSubcarpeta = "2025/Informes_semestrales_Diciembre";
+      
+      llamarBackend('getSubfolderContents', [idRoot, rutaSubcarpeta], onFilesFetched, function(err) {
+          showBrowserError("No se encontró el informe anterior o la carpeta 2025 no existe: " + err.message);
       });
   }
   
