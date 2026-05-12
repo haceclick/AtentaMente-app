@@ -2121,7 +2121,7 @@
               idDrive: UPLOAD_PROPIO_DATA.idDrive,
               prestador: UPLOAD_PROPIO_DATA.prestador,
               especialidad: UPLOAD_PROPIO_DATA.especialidad,
-              fileName: `Informe_${UPLOAD_PROPIO_DATA.paciente.replace(/\s+/g, '_')}_Especial.pdf`,
+              fileName: `Informe_${UPLOAD_PROPIO_DATA.paciente.replace(/\s+/g, '_')}_${UPLOAD_PROPIO_DATA.especialidad.replace(/\s+/g, '_')}.pdf`,
               mimeType: file.type,
               base64Data: e.target.result
           };
