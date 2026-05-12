@@ -460,12 +460,16 @@
                           </div>
                       </div>
                       
-                      <div class="flex gap-2 pt-2">
-                        <div class="flex gap-2 pt-2">
-                          <button id="btn-editar-plantilla" onclick="abrirEditorTemplate()" class="flex-1 py-2 border border-slate-200 text-slate-600 rounded text-[11px] font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-1" title="Editar plantilla general"><i data-lucide="layout-template" class="w-3 h-3"></i> Plantilla</button>
-                          <button onclick="cargarUltimoInforme(this)" class="flex-[1.5] py-2 bg-indigo-500 text-white rounded text-[11px] font-bold hover:bg-indigo-600 shadow-sm transition-colors flex items-center justify-center gap-1" title="Recuperar lo último escrito para este paciente"><i data-lucide="history" class="w-3 h-3"></i> Cargar Anterior</button>
-                          <button onclick="generarBorradorDoc()" class="flex-1 py-2 bg-[#008395] text-white rounded text-[11px] font-bold hover:bg-[#006064] shadow-sm transition-colors flex items-center justify-center gap-1" title="Generar un borrador nuevo desde cero"><i data-lucide="wand-2" class="w-3 h-3"></i> Borrador</button>
-                        </div>                          <button onclick="generarBorradorDoc()" class="flex-1 py-2 bg-[#008395] text-white rounded text-[11px] font-bold hover:bg-[#006064] shadow-sm transition-colors flex items-center justify-center gap-1"><i data-lucide="wand-2" class="w-3 h-3"></i> Generar Borrador</button>
+                      <div class="flex gap-2 pt-2 w-full">
+                          <button id="btn-editar-plantilla" onclick="abrirEditorTemplate()" class="flex-1 py-2 border border-slate-200 text-slate-600 rounded text-[11px] font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-1" title="Editar plantilla general">
+                              <i data-lucide="layout-template" class="w-3 h-3"></i> Plantilla
+                          </button>
+                          <button onclick="cargarUltimoInforme(this)" class="flex-1 py-2 bg-indigo-500 text-white rounded text-[11px] font-bold hover:bg-indigo-600 shadow-sm transition-colors flex items-center justify-center gap-1" title="Recuperar lo último escrito para este paciente">
+                              <i data-lucide="history" class="w-3 h-3"></i> Cargar Anterior
+                          </button>
+                          <button onclick="generarBorradorDoc()" class="flex-1 py-2 bg-[#008395] text-white rounded text-[11px] font-bold hover:bg-[#006064] shadow-sm transition-colors flex items-center justify-center gap-1" title="Generar un borrador nuevo desde cero">
+                              <i data-lucide="wand-2" class="w-3 h-3"></i> Borrador
+                          </button>
                       </div>
                   </div>
               </div>
