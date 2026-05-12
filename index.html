@@ -461,8 +461,11 @@
                       </div>
                       
                       <div class="flex gap-2 pt-2">
-                          <button id="btn-editar-plantilla" onclick="abrirEditorTemplate()" class="flex-1 py-2 border border-slate-200 text-slate-600 rounded text-[11px] font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-1"><i data-lucide="layout-template" class="w-3 h-3"></i> Editar Plantilla</button>
-                          <button onclick="generarBorradorDoc()" class="flex-1 py-2 bg-[#008395] text-white rounded text-[11px] font-bold hover:bg-[#006064] shadow-sm transition-colors flex items-center justify-center gap-1"><i data-lucide="wand-2" class="w-3 h-3"></i> Generar Borrador</button>
+                        <div class="flex gap-2 pt-2">
+                          <button id="btn-editar-plantilla" onclick="abrirEditorTemplate()" class="flex-1 py-2 border border-slate-200 text-slate-600 rounded text-[11px] font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-1" title="Editar plantilla general"><i data-lucide="layout-template" class="w-3 h-3"></i> Plantilla</button>
+                          <button onclick="cargarUltimoInforme(this)" class="flex-[1.5] py-2 bg-indigo-500 text-white rounded text-[11px] font-bold hover:bg-indigo-600 shadow-sm transition-colors flex items-center justify-center gap-1" title="Recuperar lo último escrito para este paciente"><i data-lucide="history" class="w-3 h-3"></i> Cargar Anterior</button>
+                          <button onclick="generarBorradorDoc()" class="flex-1 py-2 bg-[#008395] text-white rounded text-[11px] font-bold hover:bg-[#006064] shadow-sm transition-colors flex items-center justify-center gap-1" title="Generar un borrador nuevo desde cero"><i data-lucide="wand-2" class="w-3 h-3"></i> Borrador</button>
+                        </div>                          <button onclick="generarBorradorDoc()" class="flex-1 py-2 bg-[#008395] text-white rounded text-[11px] font-bold hover:bg-[#006064] shadow-sm transition-colors flex items-center justify-center gap-1"><i data-lucide="wand-2" class="w-3 h-3"></i> Generar Borrador</button>
                       </div>
                   </div>
               </div>
@@ -2204,7 +2207,64 @@
           showBrowserError("No se encontró el informe anterior o la carpeta 2025 no existe: " + err.message);
       });
   }
-  
+
+// --- CARGAR EL INFORME ANTERIOR EDITABLE ---
+  function cargarUltimoInforme(btn) {
+      const pacienteIdx = document.getElementById('doc-paciente').value;
+      if(!pacienteIdx) return showToast("Seleccione un paciente primero", "error");
+
+      const p = CACHE_DATA.pacientes[pacienteIdx];
+      const tipo = document.getElementById('doc-tipo').value;
+      
+      let finalEspecialidad = CACHE_DATA.currentUserInfo.especialidad || "General";
+      let finalPrestador = CACHE_DATA.currentUserInfo.nombre;
+
+      // Calcular prestador real si es un Admin seleccionando
+      if (CACHE_DATA.isAdmin) {
+          const prestadorSel = document.getElementById('doc-admin-prestador').value;
+          if (prestadorSel && prestadorSel !== "TODOS" && CACHE_DATA.prestadoresInfo[prestadorSel]) {
+              finalPrestador = prestadorSel;
+              const titulo = CACHE_DATA.prestadoresInfo[prestadorSel].titulo || "";
+              const tLower = titulo.toLowerCase();
+              if(tLower.includes("psicopedagog")) finalEspecialidad = "Psicopedagogía";
+              else if(tLower.includes("ocupacional") || tLower.includes("terapista")) finalEspecialidad = "Terapia Ocupacional";
+              else if(tLower.includes("fonoaudiolog")) finalEspecialidad = "Fonoaudiología";
+              else if(tLower.includes("psicolog")) finalEspecialidad = "Psicología";
+              else if(tLower.includes("musicoterap")) finalEspecialidad = "Musicoterapia";
+          }
+      }
+
+      // Bloqueamos el botón mientras busca
+      const oldHtml = btn.innerHTML;
+      btn.innerHTML = '<div class="loader w-3 h-3 border-2 border-white border-t-transparent"></div>';
+      btn.disabled = true;
+
+      // Llamamos a nuestro puente
+      llamarBackend('getUltimoInforme', [p.paciente, finalPrestador, finalEspecialidad, tipo], function(res) {
+          btn.innerHTML = oldHtml;
+          btn.disabled = false;
+          
+          if(res.success && res.html) {
+              docModoEdicion = 'documento';
+              
+              // Abrimos el editor y metemos el texto crudo
+              document.getElementById('doc-panel-empty').classList.add('hidden');
+              document.getElementById('doc-panel-editor').classList.remove('hidden');
+              document.getElementById('doc-editor-title').innerHTML = `<i data-lucide="history" class="w-4 h-4"></i> Editando Anterior: ${p.paciente}`;
+              
+              document.getElementById('doc-editor-area').value = res.html;
+              lucide.createIcons();
+              showToast("Texto anterior cargado con éxito.", "success");
+              
+          } else {
+              showToast("Este paciente no tiene informes anteriores guardados por ti.", "warning");
+          }
+      }, function(err) {
+          btn.innerHTML = oldHtml;
+          btn.disabled = false;
+          showToast("Error de conexión: " + err.message, "error");
+      });
+  }
 </script>
 </body>
 </html>
