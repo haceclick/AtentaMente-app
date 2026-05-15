@@ -2239,12 +2239,19 @@
 
       const reader = new FileReader();
       reader.onload = function(e) {
+          
+          // Limpiamos los 3 datos principales (sin acentos y sin espacios extra)
+          const pacienteLimpio = UPLOAD_PROPIO_DATA.paciente.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+          const especialidadLimpia = UPLOAD_PROPIO_DATA.especialidad.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+          const prestadorLimpio = UPLOAD_PROPIO_DATA.prestador.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
           const payload = {
               paciente: UPLOAD_PROPIO_DATA.paciente,
               idDrive: UPLOAD_PROPIO_DATA.idDrive,
               prestador: UPLOAD_PROPIO_DATA.prestador,
               especialidad: UPLOAD_PROPIO_DATA.especialidad,
-              fileName: `Informe_${UPLOAD_PROPIO_DATA.paciente.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()}_${UPLOAD_PROPIO_DATA.especialidad.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()}.pdf`,
+              // AQUÍ ARMAMOS EL NOMBRE COMPLETO CON PRESTACIÓN Y PRESTADOR:
+              fileName: `Informe_${pacienteLimpio}_${especialidadLimpia}.pdf`,
               base64Data: e.target.result
           };
 
