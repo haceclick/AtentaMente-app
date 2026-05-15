@@ -111,6 +111,24 @@
        </div>
     </div>
 
+    <div id="modal-config-os" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+       <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
+          <div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
+             <h3 class="font-bold text-slate-700 text-sm uppercase"><i data-lucide="settings-2" class="w-4 h-4 inline mr-1"></i> Configurar Obras Sociales</h3>
+             <button onclick="document.getElementById('modal-config-os').classList.add('hidden')" class="text-slate-400 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+          </div>
+          <div class="p-5 flex-1 overflow-y-auto">
+             <p class="text-xs text-gray-500 mb-4">Selecciona qué Obras Sociales están obligadas a entregar informes mediante la plataforma. Las desmarcadas no aparecerán en la lista de control.</p>
+             <div id="lista-os-checkboxes" class="space-y-2 grid grid-cols-2 gap-2">
+                 </div>
+          </div>
+          <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
+             <button onclick="document.getElementById('modal-config-os').classList.add('hidden')" class="text-slate-500 border border-slate-300 bg-white px-4 py-2 rounded shadow-sm text-xs font-bold hover:bg-slate-100 transition-colors">Cancelar</button>
+             <button id="btn-save-os" onclick="guardarConfigOS()" class="bg-[#008395] text-white px-5 py-2 rounded shadow-md text-xs font-bold hover:bg-[#006064] transition-colors"><i data-lucide="save" class="w-4 h-4 inline mr-1"></i> Guardar</button>
+          </div>
+       </div>
+    </div>
+
     <div id="mobile-overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden glass transition-opacity"></div>
 
     <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 flex flex-col z-50 shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out md:translate-x-0 md:relative md:inset-auto">
@@ -369,12 +387,15 @@
                      </div>
                  </div>
                  
-                  <div class="flex gap-2">
+                 <div class="flex gap-2">
                     <button id="btn-open-hc-folder" onclick="openPatientFilesFromHC()" class="bg-white text-[#008395] border border-gray-200 px-3 py-2 rounded-lg text-xs font-bold hover:bg-gray-50 flex items-center gap-2 transition-colors" title="Abrir Archivos">
                         <i data-lucide="folder-open" class="w-4 h-4"></i> <span class="hidden md:inline">Archivos</span>
                     </button>
                     <button onclick="saveHCPdf()" id="btn-save-pdf" class="bg-[#008395] text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-[#006064] flex items-center gap-2 transition-colors shadow-sm" title="Guardar PDF en Drive">
                         <i data-lucide="file-down" class="w-4 h-4"></i> <span class="hidden md:inline">Guardar PDF</span>
+                    </button>
+                    <button onclick="printHC()" class="bg-white text-gray-600 border border-gray-200 px-3 py-2 rounded-lg text-xs font-bold hover:bg-gray-50 flex items-center gap-2 transition-colors" title="Imprimir">
+                        <i data-lucide="printer" class="w-4 h-4"></i> <span class="hidden md:inline">Imprimir</span>
                     </button>
                  </div>
             </div> 
@@ -425,6 +446,7 @@
                           <select id="doc-admin-prestador" onchange="cargarPacientesDoc()" class="w-full p-2 border border-[#008395]/30 bg-white rounded text-xs focus:border-[#008395] outline-none text-[#008395] font-bold">
                               <option value="TODOS">Todos los Prestadores</option>
                           </select>
+                          <button onclick="abrirConfigOS()" class="mt-2 w-full py-1.5 border border-[#008395] text-[#008395] rounded text-[10px] font-bold hover:bg-[#008395] hover:text-white transition-colors flex items-center justify-center gap-1"><i data-lucide="settings-2" class="w-3 h-3"></i> Configurar Obras Sociales Permitidas</button>
                       </div>
 
                       <div id="div-admin-especialidad-template" class="hidden p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
@@ -584,7 +606,7 @@
   // 1. URL DE TU SCRIPT DE GOOGLE
   const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzZHY_DZH9fZRgV0ELZ_ZM7iM4W8OAOMUuJ4pffX9KTCsdgxgY8-WO_oepfJZXtuI7ARw/exec";
 
-  // 2. NUESTRO PUENTE DE COMUNICACIÓN (Reemplaza a google.script.run)
+  // 2. NUESTRO PUENTE DE COMUNICACIÓN
   function llamarBackend(accion, parametros, funcionExito, funcionError) {
     fetch(GOOGLE_SCRIPT_URL, {
       redirect: "follow", 
@@ -684,7 +706,12 @@
 
     cargarPacientesDoc();
     
-    llamarBackend('getTemplates', [data.currentUserInfo.nombre], function(ts) { misTemplates = ts; });
+    // --- SOLUCIÓN: DOBLE CARGA DE PLANTILLAS MEDIANTE PUENTE ---
+    llamarBackend('getTemplates', ["ADMIN"], function(masters) {
+        llamarBackend('getTemplates', [data.currentUserInfo.nombre], function(personales) {
+            misTemplates = [...personales, ...masters];
+        });
+    });
 
     setInterval(function() {
         if (!document.getElementById('view-dashboard').classList.contains('hidden')) {
@@ -693,7 +720,6 @@
     }, 10000);
   }
 
-  // --- REEMPLAZO EN NOTIFICACIONES ---
   function guardarOEditarNotificacion() {
       const id = document.getElementById('notif-id').value;
       const titulo = document.getElementById('notif-titulo').value;
@@ -1351,6 +1377,50 @@
      REC.start();
   }
 
+  function printHC() { 
+      const paciente = document.getElementById('hc-patient-name').innerText; 
+      const dni = document.getElementById('hc-data-dni').value; 
+      const afiliado = document.getElementById('hc-data-afiliado').value; 
+      const dx = document.getElementById('hc-data-dx').value; 
+      const pNombre = CACHE_DATA.currentUserInfo.nombre; 
+      const pTitulo = CACHE_DATA.currentUserInfo.titulo; 
+      const pFirmaUrl = CACHE_DATA.firmaUrl; 
+      let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;margin:20px;font-size:12px;color:#333}.header{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #008395;padding-bottom:15px;margin-bottom:20px}.title h1{margin:0;font-size:24px;color:#008395;font-weight:bold}.title p{margin:5px 0 0;font-size:11px;color:#666}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:20px}.info-item{background:#f8f9fa;padding:10px;border-radius:5px;border-left:3px solid #008395}.info-item .label{display:block;font-size:9px;color:#666;text-transform:uppercase;font-weight:bold;margin-bottom:3px}.info-item .val{display:block;font-size:13px;color:#333;font-weight:600}table{width:100%;border-collapse:collapse;margin-top:15px}thead{background:#008395;color:white}th{padding:10px;text-align:left;font-size:11px;font-weight:bold;text-transform:uppercase}td{padding:10px;border-bottom:1px solid #e0e0e0;font-size:11px;vertical-align:top}tbody tr:hover{background:#f8f9fa}.footer{margin-top:40px;padding-top:20px;border-top:2px solid #ddd;text-align:center}.firma-img{max-width:200px;height:auto;margin:0 auto 10px;display:block}.firma-box{display:inline-block;text-align:center;padding:15px 30px;border-top:2px solid #333;margin-top:10px}@media print{body{margin:15px}.header{page-break-after:avoid}}</style></head><body>'; 
+      html += '<div class="header"><div class="title"><h1>Historia Clínica</h1><p>Fecha de emisión: ' + new Date().toLocaleDateString('es-AR') + '</p></div><div><img src="https://lh3.googleusercontent.com/d/15_VzgzHnHcu0jSrnU4ddmcl65-VnQXZq" style="height:70px;width:auto;"></div></div>'; 
+      html += '<div class="info-grid"><div><div class="info-item"><span class="label">Paciente</span><span class="val">' + paciente + '</span></div><div class="info-item"><span class="label">DNI</span><span class="val">' + dni + '</span></div></div><div><div class="info-item"><span class="label">N° Afiliado</span><span class="val">' + afiliado + '</span></div><div class="info-item"><span class="label">Diagnóstico</span><span class="val">' + dx + '</span></div></div></div>'; 
+      html += '<table><thead><tr><th width="20%">Fecha</th><th>Evolución</th><th width="25%">Profesional</th></tr></thead><tbody>'; 
+      if(CURRENT_HC_HISTORIAL.length === 0) { 
+          html += '<tr><td colspan="3" style="text-align:center; padding: 20px; color:#999;">Sin registros</td></tr>'; 
+      } else { 
+          CURRENT_HC_HISTORIAL.forEach(function(h) { 
+              html += '<tr><td>' + h.fecha + '</td><td style="white-space: pre-wrap;">' + h.texto + '</td><td>' + h.profesional + '</td></tr>'; 
+          }); 
+      } 
+      html += '</tbody></table><div class="footer">'; 
+      if(pFirmaUrl) { html += '<img src="' + pFirmaUrl + '" class="firma-img"><br>'; } 
+      html += '<div class="firma-box"><strong>' + pNombre + '</strong><br><span style="font-size:11px;color:#666;">' + pTitulo + '</span></div></div></body></html>'; 
+      let printFrame = document.getElementById('print-iframe'); 
+      if (!printFrame) { 
+          printFrame = document.createElement('iframe'); 
+          printFrame.id = 'print-iframe'; 
+          printFrame.style.position = 'fixed'; 
+          printFrame.style.right = '0'; 
+          printFrame.style.bottom = '0'; 
+          printFrame.style.width = '0'; 
+          printFrame.style.height = '0'; 
+          printFrame.style.border = 'none'; 
+          printFrame.style.zIndex = '-1000'; 
+          document.body.appendChild(printFrame); 
+      } 
+      printFrame.contentDocument.open(); 
+      printFrame.contentDocument.write(html); 
+      printFrame.contentDocument.close(); 
+      setTimeout(function() { 
+          printFrame.contentWindow.focus(); 
+          printFrame.contentWindow.print(); 
+      }, 500); 
+  }
+
   function openPatientFilesFromHC() {
       const idDrive = document.getElementById('hc-data-iddrive').value;
       const patientName = document.getElementById('hc-patient-name').innerText;
@@ -1440,7 +1510,6 @@
       });
   }
 
-  // --- REEMPLAZO EN GESTIÓN DE ARCHIVOS ---
   function loadBrowser(type) {
     const titles = { horarios: 'Horarios', documentacion: 'Documentación', instructivos: 'Instructivos' };
     document.getElementById('browser-title').innerText = titles[type];
@@ -1571,14 +1640,12 @@
       const file = event.target.files[0];
       if (!file) return;
       
-      // --- NUEVO BLOQUEO: RECHAZA TODO LO QUE NO SEA PDF ---
       if (file.type !== "application/pdf") {
           showToast("Formato inválido. Solo se permiten archivos PDF.", "error");
           document.getElementById('file-upload-input').value = '';
           return;
       }
       
-      // Bloqueo de seguridad: Límite de 5MB
       if (file.size > 5242880) {
           showToast("El archivo es muy pesado (Máximo 5MB)", "error");
           document.getElementById('file-upload-input').value = '';
@@ -1639,7 +1706,9 @@
     });
   }
 
-  // --- LÓGICA DE DOCUMENTACIÓN CLÍNICA (Y CONTROL DE INFORMES) ---
+  // =====================================
+  // LÓGICA DE DOCUMENTACIÓN CLÍNICA
+  // =====================================
   let TEXTOS_BASE = {
       "Informe": "Se comienza por realizar una evaluación para conocer al paciente y así poder plantear un plan de tratamiento acorde.\n\nEl paciente [PACIENTE] (DNI: [DNI]) llega al consultorio. Durante la evaluación, demostró...\n\nEl tratamiento se encuentra enfocado en favorecer el desarrollo desde el área de [ESPECIALIDAD].",
       "Plan de Tratamiento": "PLAN DE TRATAMIENTO\nA partir de la derivación médica, se propone dar comienzo al abordaje terapéutico en el área de [ESPECIALIDAD] con el paciente: [PACIENTE] (DNI: [DNI]).\n\nOBJETIVOS A CORTO PLAZO\n· Favorecer la comunicación.\n· Beneficiar el desarrollo e independencia del niño.\n\nMODALIDAD DE ABORDAJE\nAbordaje mediante sesiones individuales.",
@@ -1649,6 +1718,29 @@
   let docModoEdicion = 'documento'; 
   let misTemplates = [];
   let periodoEvaluadoGlobal = ""; 
+
+  // --- DETECTOR ESTRICTO POR DICCIONARIO DE EQUIVALENCIAS ---
+  function normalizarEspecialidad(info) {
+      if (!info) return "General";
+      if (!info.titulo) return info.especialidad || "General";
+      
+      const tituloExacto = info.titulo.trim().toUpperCase();
+      
+      const equivalencias = {
+          "LIC. EN PSICOPEDAGOGIA": "Psicopedagogía",
+          "LIC. EN MUSICOTERAPIA": "Musicoterapia",
+          "LIC. EN PSICOLOGIA": "Psicología",
+          "LIC. FONOAUDIOLOGIA": "Fonoaudiología",
+          "LIC. EN FONOAUDIOLOGIA": "Fonoaudiología",
+          "LIC. EN TERAPIA OCUPACIONAL": "Terapia Ocupacional",
+          "TERAPISTA OCUPACIONAL": "Terapia Ocupacional",
+          "FONOAUDIOLOGA": "Fonoaudiología",
+          "LIC. TERÁPIA OCUPACIONAL": "Terapia Ocupacional", 
+          "LIC. PISCOLOGIA": "Psicología" 
+      };
+      
+      return equivalencias[tituloExacto] || info.especialidad || "General";
+  }
 
   function cargarPacientesDoc() {
       const selectPacientes = document.getElementById('doc-paciente');
@@ -1660,7 +1752,6 @@
       CACHE_DATA.pacientes.forEach((p, idx) => {
           if (prestadorSeleccionado && prestadorSeleccionado !== "TODOS" && p.prestador !== prestadorSeleccionado) return;
           
-          // NO filtramos las Obras Sociales aquí, todos deben poder ver sus pacientes y generar textos
           let nombreLimpio = p.paciente.trim().toUpperCase();
           if (!nombresVistos.has(nombreLimpio)) {
               nombresVistos.add(nombreLimpio);
@@ -1712,7 +1803,9 @@
           let osDelPaciente = partesOS.length > 1 ? partesOS[partesOS.length - 1].trim().toUpperCase() : 'PARTICULAR';
           let statusOS = CACHE_DATA.osConfig ? (CACHE_DATA.osConfig[osDelPaciente] || 'SI') : 'SI';
           
-          if (statusOS === 'NO') return; 
+          if (CACHE_DATA.osHabilitadas) {
+              if (!CACHE_DATA.osHabilitadas.includes(osDelPaciente)) return; 
+          }
 
           let nombreLimpio = p.paciente.trim().toUpperCase();
           if (pVistos.has(nombreLimpio)) return;
@@ -1725,7 +1818,6 @@
           let statusLabel = '';
           let actionHtml = '-';
           
-          // Lógica de separación: Etiqueta vs Botones
           if (statusOS === 'PROPIO') {
               if (tieneInforme) {
                   statusLabel = `<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-300">ENTREGADO</span>`;
@@ -1749,7 +1841,6 @@
 
           const fecha = tieneInforme ? inf.fecha : '-';
           
-          // Botón fijo para el Informe Anterior
           const btnAnterior = `<button onclick="abrirInformeAnterior('${p.idDrive}', '${p.paciente}')" class="p-1.5 text-gray-500 hover:text-[#008395] hover:bg-gray-100 rounded transition-colors" title="Ver Informe Dic 2025"><i data-lucide="history" class="w-4 h-4"></i></button>`;
 
           rows += `<tr class="hover:bg-slate-50 border-b border-gray-100 transition-colors">
@@ -1791,20 +1882,22 @@
   }
 
   function obtenerTemplateBase(tipo) {
-      let finalEspecialidad = CACHE_DATA.currentUserInfo.especialidad || "General";
+      let infoRef = CACHE_DATA.currentUserInfo;
+      
       if (CACHE_DATA.isAdmin) {
           const prestadorSel = document.getElementById('doc-admin-prestador').value;
           if (prestadorSel && prestadorSel !== "TODOS" && CACHE_DATA.prestadoresInfo[prestadorSel]) {
-              const titulo = CACHE_DATA.prestadoresInfo[prestadorSel].titulo || "";
-              const tLower = titulo.toLowerCase();
-              if(tLower.includes("psicopedagog")) finalEspecialidad = "Psicopedagogía";
-              else if(tLower.includes("ocupacional") || tLower.includes("terapista")) finalEspecialidad = "Terapia Ocupacional";
-              else if(tLower.includes("fonoaudiolog")) finalEspecialidad = "Fonoaudiología";
-              else if(tLower.includes("psicolog")) finalEspecialidad = "Psicología";
-              else if(tLower.includes("musicoterap")) finalEspecialidad = "Musicoterapia";
+              infoRef = CACHE_DATA.prestadoresInfo[prestadorSel];
           }
       }
-      const tempPersonalizado = misTemplates.find(t => t.tipo === tipo && t.especialidad === finalEspecialidad);
+
+      const especialidadExacta = normalizarEspecialidad(infoRef);
+
+      const tempPersonalizado = misTemplates.find(t => {
+          return (t.tipo || "").trim() === tipo.trim() && 
+                 (t.especialidad || "").trim() === especialidadExacta;
+      });
+      
       return tempPersonalizado ? tempPersonalizado.html : TEXTOS_BASE[tipo];
   }
 
@@ -1819,6 +1912,7 @@
       document.getElementById('doc-panel-empty').classList.add('hidden');
       document.getElementById('doc-panel-editor').classList.remove('hidden');
       document.getElementById('doc-editor-title').innerHTML = `<i data-lucide="layout-template" class="w-4 h-4"></i> Editando Plantilla: ${tipo}`;
+      document.getElementById('btn-save-doc').innerHTML = `<i data-lucide="save" class="w-3 h-3"></i> Guardar Plantilla`;
       
       document.getElementById('doc-editor-area').value = obtenerTemplateBase(tipo);
       lucide.createIcons();
@@ -1832,21 +1926,17 @@
       const p = CACHE_DATA.pacientes[pacienteIdx];
       const tipo = document.getElementById('doc-tipo').value;
       
-      let finalEspecialidad = CACHE_DATA.currentUserInfo.especialidad || "General";
+      let texto = obtenerTemplateBase(tipo);
+
+      let infoRef = CACHE_DATA.currentUserInfo;
       if (CACHE_DATA.isAdmin) {
-          const prestadorSel = document.getElementById('doc-admin-prestador').value;
-          if (prestadorSel && prestadorSel !== "TODOS" && CACHE_DATA.prestadoresInfo[prestadorSel]) {
-              const titulo = CACHE_DATA.prestadoresInfo[prestadorSel].titulo || "";
-              const tLower = titulo.toLowerCase();
-              if(tLower.includes("psicopedagog")) finalEspecialidad = "Psicopedagogía";
-              else if(tLower.includes("ocupacional") || tLower.includes("terapista")) finalEspecialidad = "Terapia Ocupacional";
-              else if(tLower.includes("fonoaudiolog")) finalEspecialidad = "Fonoaudiología";
-              else if(tLower.includes("psicolog")) finalEspecialidad = "Psicología";
-              else if(tLower.includes("musicoterap")) finalEspecialidad = "Musicoterapia";
+          const sel = document.getElementById('doc-admin-prestador').value;
+          if (sel !== "TODOS" && CACHE_DATA.prestadoresInfo[sel]) {
+              infoRef = CACHE_DATA.prestadoresInfo[sel];
           }
       }
+      const especialidadFinal = normalizarEspecialidad(infoRef);
 
-      // --- ALERTA Y BLOQUEO PARA OS "PROPIO" ---
       let partesOS = p.paciente.split('_');
       let osDelPaciente = partesOS.length > 1 ? partesOS[partesOS.length - 1].trim().toUpperCase() : 'PARTICULAR';
       let statusOS = CACHE_DATA.osConfig ? (CACHE_DATA.osConfig[osDelPaciente] || 'SI') : 'SI';
@@ -1854,7 +1944,7 @@
       const btnPrev = document.getElementById('btn-previsualizar-doc');
       if (statusOS === 'PROPIO') {
           showToast("⚠️ OS con modelo propio. Copia este borrador, pero el PDF debe subirse manual desde la tabla de abajo.", "warning");
-          if(btnPrev) btnPrev.classList.add('hidden'); // Oculta el botón de guardar
+          if(btnPrev) btnPrev.classList.add('hidden'); 
       } else {
           if(btnPrev) btnPrev.classList.remove('hidden');
       }
@@ -1866,10 +1956,9 @@
       let mesFin = (isPrimerSem ? "Junio " : "Diciembre ") + new Date().getFullYear();
       periodoEvaluadoGlobal = `${mesInicio} a ${mesFin}`;
 
-      let texto = obtenerTemplateBase(tipo);
       texto = texto.replace(/\[PACIENTE\]/g, p.paciente);
       texto = texto.replace(/\[DNI\]/g, p.dni || "S/D");
-      texto = texto.replace(/\[ESPECIALIDAD\]/g, finalEspecialidad);
+      texto = texto.replace(/\[ESPECIALIDAD\]/g, especialidadFinal);
       
       document.getElementById('doc-panel-empty').classList.add('hidden');
       document.getElementById('doc-panel-editor').classList.remove('hidden');
@@ -1892,28 +1981,19 @@
       btn.disabled = true;
       btn.innerHTML = `<div class="loader w-3 h-3 border-2 border-white border-t-transparent"></div> Generando...`;
 
-      let finalPrestador = CACHE_DATA.currentUserInfo.nombre;
-      let finalTitulo = CACHE_DATA.currentUserInfo.titulo;
-      let finalMatricula = CACHE_DATA.currentUserInfo.matricula;
-      let finalFirmaUrl = CACHE_DATA.firmaUrl;
-      let finalEspecialidad = CACHE_DATA.currentUserInfo.especialidad || "General";
-
+      let infoRef = CACHE_DATA.currentUserInfo;
       if (CACHE_DATA.isAdmin) {
           const prestadorSel = document.getElementById('doc-admin-prestador').value;
           if (prestadorSel && prestadorSel !== "TODOS" && CACHE_DATA.prestadoresInfo[prestadorSel]) {
-              finalPrestador = prestadorSel;
-              const info = CACHE_DATA.prestadoresInfo[prestadorSel];
-              finalTitulo = info.titulo || "";
-              finalMatricula = info.matricula || "";
-              finalFirmaUrl = info.firmaUrl || "";
-              const tLower = finalTitulo.toLowerCase();
-              if(tLower.includes("psicopedagog")) finalEspecialidad = "Psicopedagogía";
-              else if(tLower.includes("ocupacional") || tLower.includes("terapista")) finalEspecialidad = "Terapia Ocupacional";
-              else if(tLower.includes("fonoaudiolog")) finalEspecialidad = "Fonoaudiología";
-              else if(tLower.includes("psicolog")) finalEspecialidad = "Psicología";
-              else if(tLower.includes("musicoterap")) finalEspecialidad = "Musicoterapia";
+              infoRef = CACHE_DATA.prestadoresInfo[prestadorSel];
           }
       }
+
+      let finalPrestador = infoRef.nombre || CACHE_DATA.currentUserInfo.nombre;
+      let finalTitulo = infoRef.titulo || "";
+      let finalMatricula = infoRef.matricula || "";
+      let finalFirmaUrl = infoRef.firmaUrl || "";
+      let finalEspecialidad = normalizarEspecialidad(infoRef);
 
       let rawDate = document.getElementById('doc-fecha').value;
       let fechaDocFinal = new Date().toLocaleDateString('es-AR');
@@ -1962,7 +2042,7 @@
               matricula: finalMatricula,
               periodo: periodoEvaluadoGlobal,
               firmaUrl: finalFirmaUrl,
-              fechaDoc: new Date().toLocaleDateString('es-AR')
+              fechaDoc: fechaDocFinal
           };
           
           llamarBackend('guardarDocumentoClinico', [payload], function(res) {
@@ -1994,28 +2074,19 @@
       const p = pacienteIdx ? CACHE_DATA.pacientes[pacienteIdx] : { paciente: '[PACIENTE]', dni: '[DNI]', aprobado: '-' };
       const tipo = document.getElementById('doc-tipo').value;
 
-      let finalPrestador = CACHE_DATA.currentUserInfo.nombre;
-      let finalTitulo = CACHE_DATA.currentUserInfo.titulo;
-      let finalMatricula = CACHE_DATA.currentUserInfo.matricula;
-      let finalFirmaUrl = CACHE_DATA.firmaUrl;
-      let finalEspecialidad = CACHE_DATA.currentUserInfo.especialidad || "General";
-
+      let infoRef = CACHE_DATA.currentUserInfo;
       if (CACHE_DATA.isAdmin) {
           const prestadorSel = document.getElementById('doc-admin-prestador').value;
           if (prestadorSel && prestadorSel !== "TODOS" && CACHE_DATA.prestadoresInfo[prestadorSel]) {
-              finalPrestador = prestadorSel;
-              const info = CACHE_DATA.prestadoresInfo[prestadorSel];
-              finalTitulo = info.titulo || "";
-              finalMatricula = info.matricula || "";
-              finalFirmaUrl = info.firmaUrl || "";
-              const tLower = finalTitulo.toLowerCase();
-              if(tLower.includes("psicopedagog")) finalEspecialidad = "Psicopedagogía";
-              else if(tLower.includes("ocupacional") || tLower.includes("terapista")) finalEspecialidad = "Terapia Ocupacional";
-              else if(tLower.includes("fonoaudiolog")) finalEspecialidad = "Fonoaudiología";
-              else if(tLower.includes("psicolog")) finalEspecialidad = "Psicología";
-              else if(tLower.includes("musicoterap")) finalEspecialidad = "Musicoterapia";
+              infoRef = CACHE_DATA.prestadoresInfo[prestadorSel];
           }
       }
+
+      let finalPrestador = infoRef.nombre || CACHE_DATA.currentUserInfo.nombre;
+      let finalTitulo = infoRef.titulo || "";
+      let finalMatricula = infoRef.matricula || "";
+      let finalFirmaUrl = infoRef.firmaUrl || "";
+      let finalEspecialidad = normalizarEspecialidad(infoRef);
 
       let rawDate = document.getElementById('doc-fecha').value;
       let fechaDocFinal = new Date().toLocaleDateString('es-AR');
@@ -2071,6 +2142,51 @@
       document.getElementById('modal-preview').classList.remove('hidden');
   }
 
+  function abrirConfigOS() {
+      const contenedor = document.getElementById('lista-os-checkboxes');
+      contenedor.innerHTML = '';
+      let todasLasOS = new Set();
+      CACHE_DATA.pacientes.forEach(p => {
+          if (p.paciente.includes('_')) {
+              todasLasOS.add(p.paciente.split('_')[1].trim().toUpperCase());
+          }
+      });
+      const arrayOS = Array.from(todasLasOS).sort();
+      arrayOS.forEach(os => {
+          const isChecked = (CACHE_DATA.osHabilitadas && CACHE_DATA.osHabilitadas.includes(os)) ? 'checked' : '';
+          contenedor.innerHTML += `
+              <label class="flex items-center gap-3 p-2 hover:bg-slate-100 rounded cursor-pointer border border-transparent hover:border-slate-200 transition-colors">
+                  <input type="checkbox" value="${os}" class="os-checkbox w-4 h-4 text-[#008395] rounded border-gray-300 focus:ring-[#008395]" ${isChecked}>
+                  <span class="text-xs font-bold text-slate-700">${os}</span>
+              </label>
+          `;
+      });
+      document.getElementById('modal-config-os').classList.remove('hidden');
+  }
+
+  function guardarConfigOS() {
+      const checkboxes = document.querySelectorAll('.os-checkbox:checked');
+      const seleccionadas = Array.from(checkboxes).map(cb => cb.value);
+      const btn = document.getElementById('btn-save-os');
+      const prev = btn.innerHTML;
+      btn.innerHTML = 'Guardando...'; btn.disabled = true;
+
+      llamarBackend('guardarConfigOS', [seleccionadas], function(res) {
+          btn.innerHTML = prev; btn.disabled = false;
+          if (res.success) {
+              document.getElementById('modal-config-os').classList.add('hidden');
+              CACHE_DATA.osHabilitadas = seleccionadas; 
+              cargarPacientesDoc(); 
+              showToast("Obras Sociales actualizadas.", "success");
+          } else {
+              showToast("Error: " + res.error, "error");
+          }
+      }, function(err) {
+          btn.innerHTML = prev; btn.disabled = false;
+          showToast("Error al guardar: " + err.message, "error");
+      });
+  }
+
   function abrirCarpetaInformesDirecta(idRoot, pacienteNombre) {
       const anioActual = new Date().getFullYear();
       const isPrimerSemestre = (new Date().getMonth() + 1) <= 6;
@@ -2082,38 +2198,28 @@
       document.getElementById('view-browser').classList.remove('hidden');
       document.getElementById('browser-title').innerText = "Informes " + (isPrimerSemestre ? "Junio" : "Diciembre") + ": " + pacienteNombre;
       
+      IS_LIST_VIEW = true;
       EXIT_VIEW = 'docclinica';
       NAV_HISTORY = [{ id: idRoot, canEdit: false }]; 
       CURRENT_FOLDER_ID = idRoot;
-      IS_LIST_VIEW = true; 
-      
-      const icon = document.getElementById('icon-view-mode');
-      if(icon) icon.setAttribute('data-lucide', 'layout-grid');
 
       resetBrowser();
-      
       llamarBackend('getSubfolderContents', [idRoot, rutaSubcarpeta], onFilesFetched, function(err) {
           showBrowserError("No se pudo cargar la carpeta: " + err.message);
       });
   }
-// --- LÓGICA PARA SUBIR INFORMES "PROPIOS" ---
+
+  // --- LÓGICA PARA SUBIR INFORMES "PROPIOS" ---
   let UPLOAD_PROPIO_DATA = null;
 
   function triggerUploadPropio(paciente, idDrive, prestador) {
       if(!idDrive || idDrive.length < 5) return showToast("El paciente no tiene carpeta de Drive vinculada.", "error");
       
-      let finalEspecialidad = CACHE_DATA.currentUserInfo.especialidad || "General";
-      if (CACHE_DATA.isAdmin && prestador) {
-           const info = CACHE_DATA.prestadoresInfo[prestador];
-           if(info && info.titulo) {
-                const tLower = info.titulo.toLowerCase();
-                if(tLower.includes("psicopedagog")) finalEspecialidad = "Psicopedagogía";
-                else if(tLower.includes("ocupacional") || tLower.includes("terapista")) finalEspecialidad = "Terapia Ocupacional";
-                else if(tLower.includes("fonoaudiolog")) finalEspecialidad = "Fonoaudiología";
-                else if(tLower.includes("psicolog")) finalEspecialidad = "Psicología";
-                else if(tLower.includes("musicoterap")) finalEspecialidad = "Musicoterapia";
-           }
+      let infoRef = CACHE_DATA.currentUserInfo;
+      if (CACHE_DATA.isAdmin && prestador && CACHE_DATA.prestadoresInfo[prestador]) {
+           infoRef = CACHE_DATA.prestadoresInfo[prestador];
       }
+      let finalEspecialidad = normalizarEspecialidad(infoRef);
       
       UPLOAD_PROPIO_DATA = { paciente, idDrive, prestador, especialidad: finalEspecialidad };
       document.getElementById('file-upload-propio').click();
@@ -2138,7 +2244,8 @@
               idDrive: UPLOAD_PROPIO_DATA.idDrive,
               prestador: UPLOAD_PROPIO_DATA.prestador,
               especialidad: UPLOAD_PROPIO_DATA.especialidad,
-              fileName: `Informe_${UPLOAD_PROPIO_DATA.paciente.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()}_${UPLOAD_PROPIO_DATA.especialidad.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()}.pdf`,              base64Data: e.target.result
+              fileName: `Informe_${UPLOAD_PROPIO_DATA.paciente.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()}_${UPLOAD_PROPIO_DATA.especialidad.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()}.pdf`,
+              base64Data: e.target.result
           };
 
           showToast("Subiendo PDF especial a Drive...", "success");
@@ -2168,7 +2275,7 @@
       document.getElementById('browser-title').innerText = "Modelos Informes Especiales";
       
       EXIT_VIEW = 'docclinica'; 
-      NAV_HISTORY = []; // Vaciamos el historial para que "Atrás" vuelva directo a informes
+      NAV_HISTORY = []; 
       IS_LIST_VIEW = true; 
       IS_DOCUMENTACION_PERSONAL = false;
       
@@ -2177,15 +2284,12 @@
 
       resetBrowser();
       
-      // IMPORTANTE: Verifica si en Drive usas espacios o guiones bajos. 
-      // Aquí lo configuramos con espacios que es lo más común:
       const nombreCarpeta = "Modelos Informes Especiales"; 
 
       llamarBackend('getSubfolderContents', [idInstructivos, nombreCarpeta], function(res) {
           if (res.error) {
               showBrowserError(res.error);
           } else {
-              // Forzamos que el ID actual del buscador sea el de la subcarpeta
               CURRENT_FOLDER_ID = res.id; 
               onFilesFetched(res);
           }
@@ -2212,7 +2316,6 @@
 
       resetBrowser();
       
-      // Búsqueda directa en la subcarpeta del año pasado
       const rutaSubcarpeta = "2025/Informes_semestrales_Diciembre";
       
       llamarBackend('getSubfolderContents', [idRoot, rutaSubcarpeta], onFilesFetched, function(err) {
@@ -2220,7 +2323,6 @@
       });
   }
 
-// --- CARGAR EL INFORME ANTERIOR EDITABLE ---
   function cargarUltimoInforme(btn) {
       const pacienteIdx = document.getElementById('doc-paciente').value;
       if(!pacienteIdx) return showToast("Seleccione un paciente primero", "error");
@@ -2228,30 +2330,21 @@
       const p = CACHE_DATA.pacientes[pacienteIdx];
       const tipo = document.getElementById('doc-tipo').value;
       
-      let finalEspecialidad = CACHE_DATA.currentUserInfo.especialidad || "General";
-      let finalPrestador = CACHE_DATA.currentUserInfo.nombre;
-
-      // Calcular prestador real si es un Admin seleccionando
+      let infoRef = CACHE_DATA.currentUserInfo;
       if (CACHE_DATA.isAdmin) {
           const prestadorSel = document.getElementById('doc-admin-prestador').value;
           if (prestadorSel && prestadorSel !== "TODOS" && CACHE_DATA.prestadoresInfo[prestadorSel]) {
-              finalPrestador = prestadorSel;
-              const titulo = CACHE_DATA.prestadoresInfo[prestadorSel].titulo || "";
-              const tLower = titulo.toLowerCase();
-              if(tLower.includes("psicopedagog")) finalEspecialidad = "Psicopedagogía";
-              else if(tLower.includes("ocupacional") || tLower.includes("terapista")) finalEspecialidad = "Terapia Ocupacional";
-              else if(tLower.includes("fonoaudiolog")) finalEspecialidad = "Fonoaudiología";
-              else if(tLower.includes("psicolog")) finalEspecialidad = "Psicología";
-              else if(tLower.includes("musicoterap")) finalEspecialidad = "Musicoterapia";
+              infoRef = CACHE_DATA.prestadoresInfo[prestadorSel];
           }
       }
+      
+      let finalPrestador = infoRef.nombre || CACHE_DATA.currentUserInfo.nombre;
+      let finalEspecialidad = normalizarEspecialidad(infoRef);
 
-      // Bloqueamos el botón mientras busca
       const oldHtml = btn.innerHTML;
       btn.innerHTML = '<div class="loader w-3 h-3 border-2 border-white border-t-transparent"></div>';
       btn.disabled = true;
 
-      // Llamamos a nuestro puente
       llamarBackend('getUltimoInforme', [p.paciente, finalPrestador, finalEspecialidad, tipo], function(res) {
           btn.innerHTML = oldHtml;
           btn.disabled = false;
@@ -2259,7 +2352,6 @@
           if(res.success && res.html) {
               docModoEdicion = 'documento';
               
-              // Abrimos el editor y metemos el texto crudo
               document.getElementById('doc-panel-empty').classList.add('hidden');
               document.getElementById('doc-panel-editor').classList.remove('hidden');
               document.getElementById('doc-editor-title').innerHTML = `<i data-lucide="history" class="w-4 h-4"></i> Editando Anterior: ${p.paciente}`;
