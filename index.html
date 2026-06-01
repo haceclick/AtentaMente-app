@@ -1646,9 +1646,10 @@
           return;
       }
       
-      if (file.size > 5242880) {
-          showToast("El archivo es muy pesado (Máximo 5MB)", "error");
-          document.getElementById('file-upload-input').value = '';
+      if (file.size > 10485760) {
+          showToast("El archivo es muy pesado (Máximo 10MB)", "error");
+          // Recuerda que el input de abajo cambia según qué función estés editando
+          document.getElementById('file-upload-propio').value = ''; 
           return;
       }
 
