@@ -180,20 +180,36 @@ function getAppData(tokenDelFrontend) {
         const lastRowConfig = sheetConfig.getLastRow();
         if(lastRowConfig > 0) {
             const dataConfig = sheetConfig.getRange(1, 1, lastRowConfig, sheetConfig.getLastColumn()).getDisplayValues();
+            const richTextConfig = sheetConfig.getRange(1, 1, lastRowConfig, sheetConfig.getLastColumn()).getRichTextValues();
             const hConfig = dataConfig[0];
             const idxConfEmail = getColIndex(hConfig, ['E-MAIL', 'EMAIL']);
             const idxHorarios = getColIndex(hConfig, ['ID GOOGLE DRIVE_HORARIOS', 'HORARIOS']);
             const idxPrestadorConf = getColIndex(hConfig, ['ID GOOGLE DRIVE_PRESTADOR', 'ID_PRESTADOR']);
             const idxInstructivos = getColIndex(hConfig, ['ID GOOGLE DRIVE_INSTRUCTIVOS', 'INSTRUCTIVOS']);
             const idxFirma = getColIndex(hConfig, ['FIRMA', 'FIRMA URL']);
+            const idxNombreTerapeuta = getColIndex(hConfig, ['TERAPEUTA', 'PROFESIONAL', 'PRESTADOR']);
+            
+            this.nombreToFirma = {}; // Fallback map
             
             for(let i=1; i<dataConfig.length; i++) {
+                let fUrl = idxFirma > -1 ? dataConfig[i][idxFirma] : '';
+                if (idxFirma > -1 && richTextConfig[i] && richTextConfig[i][idxFirma] && richTextConfig[i][idxFirma].getLinkUrl()) {
+                    fUrl = richTextConfig[i][idxFirma].getLinkUrl();
+                }
                 if (idxConfEmail > -1 && dataConfig[i][idxConfEmail]) {
-                    emailToFirma[String(dataConfig[i][idxConfEmail]).toLowerCase().trim()] = idxFirma > -1 ? dataConfig[i][idxFirma] : '';
+                    emailToFirma[String(dataConfig[i][idxConfEmail]).toLowerCase().trim()] = fUrl;
+                }
+                if (idxNombreTerapeuta > -1 && dataConfig[i][idxNombreTerapeuta]) {
+                    this.nombreToFirma[String(dataConfig[i][idxNombreTerapeuta]).toLowerCase().trim()] = fUrl;
                 }
             }
 
-            let rowConf = dataConfig.find(r => r[idxConfEmail] && String(r[idxConfEmail]).trim().toLowerCase() === userEmail);
+            let rowConfIndex = dataConfig.findIndex(r => r[idxConfEmail] && String(r[idxConfEmail]).trim().toLowerCase() === userEmail);
+            if (rowConfIndex === -1 && idxNombreTerapeuta > -1 && userDisplayName) {
+                 rowConfIndex = dataConfig.findIndex(r => r[idxNombreTerapeuta] && String(r[idxNombreTerapeuta]).trim().toLowerCase() === userDisplayName.toLowerCase().trim());
+            }
+
+            let rowConf = rowConfIndex > -1 ? dataConfig[rowConfIndex] : undefined;
             if (!rowConf && isAdmin && dataConfig.length > 1) {
                 let rowFallback = dataConfig[1];
                 carpetas.horarios = idxHorarios > -1 ? rowFallback[idxHorarios] : '';
@@ -205,6 +221,9 @@ function getAppData(tokenDelFrontend) {
                 carpetas.documentacion = idxPrestadorConf > -1 ? rowConf[idxPrestadorConf] : '';
                 carpetas.instructivos = idxInstructivos > -1 ? rowConf[idxInstructivos] : '';
                 firmaUrl = idxFirma > -1 ? rowConf[idxFirma] : '';
+                if (idxFirma > -1 && richTextConfig[rowConfIndex] && richTextConfig[rowConfIndex][idxFirma] && richTextConfig[rowConfIndex][idxFirma].getLinkUrl()) {
+                    firmaUrl = richTextConfig[rowConfIndex][idxFirma].getLinkUrl();
+                }
             }
         }
     }
@@ -215,10 +234,14 @@ function getAppData(tokenDelFrontend) {
             const pres = (idxPrestador > -1) ? dataDatos[i][idxPrestador] : '';
             const em = (idxEmail > -1) ? String(dataDatos[i][idxEmail]).toLowerCase().trim() : '';
             if (pres && !prestadoresInfo[pres]) {
+                let fUrl = '';
+                if (em && emailToFirma[em]) fUrl = emailToFirma[em];
+                else if (this.nombreToFirma && this.nombreToFirma[String(pres).toLowerCase().trim()]) fUrl = this.nombreToFirma[String(pres).toLowerCase().trim()];
+
                 prestadoresInfo[pres] = {
                     titulo: (idxTituloPrestador > -1) ? dataDatos[i][idxTituloPrestador] : '',
                     matricula: (idxMatricula > -1) ? dataDatos[i][idxMatricula] : '',
-                    firmaUrl: (em && emailToFirma[em]) ? emailToFirma[em] : ''
+                    firmaUrl: fUrl
                 };
             }
         }

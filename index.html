@@ -2150,6 +2150,7 @@
           };
 
           if (documentExists) {
+              document.getElementById('modal-preview').classList.add('hidden');
               abrirModalConfirm(`Ya existe un ${payload.tipo} de ${finalEspecialidad} cargado para este paciente. ¿Deseas reemplazar el documento anterior?`, ejecutarGuardado, true);
           } else {
               ejecutarGuardado();
