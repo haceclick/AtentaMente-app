@@ -736,6 +736,7 @@ function guardarDocumentoClinico(payload) {
     
     // Preparar Firma (TAMAÑO FIJO DE APROX 5x4 cm)
     let firmaHtml = '<br>';
+    let hasFirma = false;
     if (payload.firmaUrl && payload.firmaUrl.includes('google.com')) {
         try {
             let cleanFirmaId = payload.firmaUrl;
@@ -745,11 +746,19 @@ function guardarDocumentoClinico(payload) {
             const firmaB64 = "data:" + firmaBlob.getContentType() + ";base64," + Utilities.base64Encode(firmaBlob.getBytes());
             // Tamaño de la firma forzado a 5cm ancho por maximo 4cm alto.
             firmaHtml = `<img src="${firmaB64}" style="width: 5cm; height: auto; max-height: 4cm; object-fit: contain; margin-bottom: 5px;"><br>`;
+            hasFirma = true;
         } catch(e) {} 
     }
 
     const fechaDoc = payload.fechaDoc; // Toma la fecha seleccionada en pantalla
     const matriculaDoc = payload.matricula ? `${payload.matricula}` : '';
+
+    let datosPrestadorHtml = '';
+    if (!hasFirma) {
+       datosPrestadorHtml = `<b>${payload.prestador}</b><br>
+       <span style="font-size:10px;color:#666;">${payload.titulo}</span><br>
+       <span style="font-size:10px;color:#666;">${matriculaDoc}</span>`;
+    }
 
     let htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:12px;color:#333;margin:30px}h1{color:#008395;text-transform:uppercase;font-size:18px;border-bottom:2px solid #008395;padding-bottom:10px}.datos{background:#f8fafc;padding:15px;border-left:4px solid #008395;margin-bottom:20px;line-height:1.6;font-size:11px}</style></head><body>`;
     
@@ -765,9 +774,7 @@ function guardarDocumentoClinico(payload) {
     <div style="line-height:1.6; text-align:justify;">${payload.html.replace(/\n/g, '<br>')}</div>
     <div style="margin-top:50px;text-align:center;border-top:1px solid #ccc;padding-top:10px;width:250px;margin-left:auto;margin-right:auto;">
        ${firmaHtml}
-       <b>${payload.prestador}</b><br>
-       <span style="font-size:10px;color:#666;">${payload.titulo}</span><br>
-       <span style="font-size:10px;color:#666;">${matriculaDoc}</span>
+       ${datosPrestadorHtml}
     </div></body></html>`;
     
     // Quitamos acentos y respetamos los espacios originales (con trim() para limpiar bordes)

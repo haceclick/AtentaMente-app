@@ -2197,15 +2197,23 @@
       let periodoPrev = `${mesInicio} a ${mesFin}`;
 
       let firmaHtml = '<br><span style="color:#999; font-size:10px;">[Sin firma cargada]</span><br>';
+      let hasFirma = false;
       if (finalFirmaUrl && finalFirmaUrl.includes('google.com')) {
           let cleanFirmaId = finalFirmaUrl;
           if(cleanFirmaId.includes('id=')) cleanFirmaId = cleanFirmaId.split('id=')[1].split('&')[0];
           else if(cleanFirmaId.includes('d/')) cleanFirmaId = cleanFirmaId.split('d/')[1].split('/')[0];
           
           firmaHtml = `<img src="https://drive.google.com/thumbnail?id=${cleanFirmaId}&sz=w800" style="width: 5cm; height: auto; max-height: 4cm; object-fit: contain; margin-bottom: 5px;"><br>`;
+          hasFirma = true;
       }
 
       const matriculaDoc = finalMatricula ? `${finalMatricula}` : '';
+      let datosPrestadorHtml = '';
+      if (!hasFirma) {
+          datosPrestadorHtml = `<b>${finalPrestador}</b><br>
+             <span style="font-size: 10px; color: #666;">${finalTitulo}</span><br>
+             <span style="font-size: 10px; color: #666;">${matriculaDoc}</span>`;
+      }
 
       let htmlPreview = `
       <div style="font-family: Arial, sans-serif; font-size: 13px; color: #333; max-width: 750px; margin: 0 auto; background: white; padding: 15px;">
@@ -2226,9 +2234,7 @@
           
           <div style="margin-top: 40px; text-align: center; border-top: 1px solid #ccc; padding-top: 15px; width: 250px; margin-left: auto; margin-right: auto;">
              ${firmaHtml}
-             <b>${finalPrestador}</b><br>
-             <span style="font-size: 10px; color: #666;">${finalTitulo}</span><br>
-             <span style="font-size: 10px; color: #666;">${matriculaDoc}</span>
+             ${datosPrestadorHtml}
           </div>
       </div>`;
 
