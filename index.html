@@ -1895,7 +1895,7 @@
           const periodoUpper = periodoAprob.toUpperCase();
 
           if (filtroPeriodo === "EXCLUIR_SR") {
-              if (periodoUpper.includes("SENT / SENT") || periodoUpper.includes("RESERVA / RESERVA") || periodoUpper === "SENT" || periodoUpper === "RESERVA") return;
+              if (periodoUpper.includes("SENT") || periodoUpper.includes("RESERVA")) return;
           } else if (filtroPeriodo !== "TODOS") {
               if (periodoAprob !== filtroPeriodo) return;
           }
