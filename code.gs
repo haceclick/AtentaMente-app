@@ -21,6 +21,11 @@ const ADMIN_EMAILS = [
   'fvgatto@gmail.com'
 ]; 
 
+// Correos Secretaría (sólo acceso a Informes en modo administrador)
+const SECRETARIA_EMAILS = [
+  'secretaria.atte@gmail.com'
+]; 
+
 function doGet(e) {
   const emailIngreso = (e && e.parameter && e.parameter.uid) ? e.parameter.uid : '';
   const template = HtmlService.createTemplateFromFile('index');
@@ -86,7 +91,8 @@ function getAppData(tokenDelFrontend) {
         if (!userEmail) throw new Error("Acceso denegado: Contactá al administrador del sitio.");
     }
     
-    const isAdmin = ADMIN_EMAILS.some(e => e.trim().toLowerCase() === userEmail);
+    const isSecretaria = SECRETARIA_EMAILS.some(e => e.trim().toLowerCase() === userEmail);
+    const isAdmin = ADMIN_EMAILS.some(e => e.trim().toLowerCase() === userEmail) || isSecretaria;
     let isFlavia = (userEmail === 'fvgatto@gmail.com');
     let userDisplayName = userEmail; 
     let currentUserInfo = { nombre: '', titulo: '', matricula: '' };
@@ -133,9 +139,9 @@ function getAppData(tokenDelFrontend) {
         if (idxTituloPrestador > -1 && userRow[idxTituloPrestador]) currentUserInfo.titulo = userRow[idxTituloPrestador];
         if (idxMatricula > -1 && userRow[idxMatricula]) currentUserInfo.matricula = userRow[idxMatricula];
     } else if (isAdmin) {
-        currentUserInfo.nombre = 'Administrador';
-        userDisplayName = 'Administrador';
-        currentUserInfo.titulo = 'Acceso Total';
+        currentUserInfo.nombre = isSecretaria ? 'Secretaría' : 'Administrador';
+        userDisplayName = isSecretaria ? 'Secretaría' : 'Administrador';
+        currentUserInfo.titulo = isSecretaria ? 'Gestión de Informes' : 'Acceso Total';
     } else {
         currentUserInfo.nombre = 'Profesional';
     }
@@ -457,7 +463,8 @@ function getAppData(tokenDelFrontend) {
       user: userEmail,
       userDisplayName: userDisplayName,
       isAdmin: isAdmin,
-      role: isAdmin ? 'Administrador' : 'Equipo Terapéutico',
+      isSecretaria: isSecretaria,
+      role: isSecretaria ? 'Secretaría' : (isAdmin ? 'Administrador' : 'Equipo Terapéutico'),
       pacientes: pacientesFiltrados,
       facturas: facturasList,
       financialStats: financialStats,

@@ -524,12 +524,21 @@
           </div>
 
           <div id="doc-vista-control" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mt-6">
-              <div class="bg-slate-50 px-5 py-4 border-b border-slate-100 flex justify-between items-center">
-                  <div class="flex items-center gap-2">
-                      <i data-lucide="clipboard-check" class="w-4 h-4 text-[#008395]"></i>
-                      <span class="font-bold text-xs uppercase tracking-widest text-slate-700">Estado de Entregas</span>
+              <div class="bg-slate-50 px-5 py-4 border-b border-slate-100 flex justify-between items-center gap-3 flex-wrap">
+                  <div class="flex items-center gap-3 flex-wrap">
+                      <div class="flex items-center gap-2">
+                          <i data-lucide="clipboard-check" class="w-4 h-4 text-[#008395]"></i>
+                          <span class="font-bold text-xs uppercase tracking-widest text-slate-700">Estado de Entregas</span>
+                      </div>
+                      <span id="badge-pendientes-informes" class="hidden text-[11px] font-bold px-2.5 py-1 rounded-full items-center gap-1 shadow-sm"></span>
                   </div>
-                  <button onclick="togglePendientesInformes()" id="btn-toggle-pendientes-inf" class="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded text-[10px] font-bold uppercase hover:bg-slate-50 transition-colors shadow-sm"><i data-lucide="filter" class="w-3 h-3 inline mr-1"></i> Ver Solo Pendientes</button>
+                  <div class="flex items-center gap-2 flex-wrap">
+                      <select id="filter-control-aprobado" onchange="renderControlInformes()" class="bg-white border border-slate-200 text-slate-600 px-2.5 py-1.5 rounded text-[10px] font-bold uppercase hover:border-slate-300 focus:outline-none focus:border-[#008395] transition-colors shadow-sm">
+                          <option value="EXCLUIR_SR">Excluir SENT / RESERVA (Por Defecto)</option>
+                          <option value="TODOS">Ver Todos los Periodos</option>
+                      </select>
+                      <button onclick="togglePendientesInformes()" id="btn-toggle-pendientes-inf" class="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded text-[10px] font-bold uppercase hover:bg-slate-50 transition-colors shadow-sm"><i data-lucide="filter" class="w-3 h-3 inline mr-1"></i> Ver Solo Pendientes</button>
+                  </div>
               </div>
               <div class="p-0 overflow-y-auto max-h-[500px]">
                   <table class="w-full text-left text-xs">
@@ -537,6 +546,7 @@
                           <tr>
                               <th class="px-5 py-3">Paciente</th>
                               <th class="px-5 py-3">Prestador</th>
+                              <th class="px-5 py-3">Periodo Aprob.</th>
                               <th class="px-5 py-3 text-center">Estado</th>
                               <th class="px-5 py-3 text-center">Última Fecha</th>
                               <th class="px-5 py-3 text-center">Inf. Anterior</th>
@@ -726,6 +736,20 @@
     }
 
     cargarPacientesDoc();
+    
+    if (data.isSecretaria) {
+      document.querySelectorAll('.nav-item').forEach(function(b) {
+        if (b.id !== 'btn-docclinica') b.classList.add('hidden');
+      });
+      document.querySelectorAll('#sidebar nav div').forEach(function(div) {
+        div.classList.add('hidden');
+      });
+      const syncBtn = document.getElementById('admin-sync-btn');
+      if (syncBtn) syncBtn.classList.add('hidden');
+      const addNotifBtn = document.getElementById('btn-add-notif');
+      if (addNotifBtn) addNotifBtn.classList.add('hidden');
+      nav('docclinica');
+    }
     
     // --- SOLUCIÓN: DOBLE CARGA DE PLANTILLAS MEDIANTE PUENTE ---
     llamarBackend('getTemplates', ["ADMIN"], function(masters) {
@@ -1087,6 +1111,9 @@
   }
 
   function nav(view) {
+    if (typeof CACHE_DATA !== 'undefined' && CACHE_DATA && CACHE_DATA.isSecretaria && view !== 'docclinica') {
+      return;
+    }
     const sidebar = document.getElementById('sidebar');
     if(sidebar && !sidebar.classList.contains('-translate-x-full') && window.innerWidth < 768) { toggleMenu(); }
     document.querySelectorAll('.nav-item').forEach(function(b) { b.classList.remove('active'); });
@@ -1785,6 +1812,7 @@
       
       selectPacientes.innerHTML = '<option value="" disabled selected>Seleccione paciente...</option>';
       let nombresVistos = new Set();
+      let periodosVistos = new Set();
       
       CACHE_DATA.pacientes.forEach((p, idx) => {
           if (prestadorSeleccionado && prestadorSeleccionado !== "TODOS" && p.prestador !== prestadorSeleccionado) return;
@@ -1794,7 +1822,25 @@
               nombresVistos.add(nombreLimpio);
               selectPacientes.innerHTML += `<option value="${idx}">${p.paciente.trim()}</option>`;
           }
+          if (p.aprobado && p.aprobado.trim() !== '-' && p.aprobado.trim() !== '') {
+              periodosVistos.add(p.aprobado.trim());
+          }
       });
+
+      const selectPeriodo = document.getElementById('filter-control-aprobado');
+      if (selectPeriodo) {
+          const valActual = selectPeriodo.value || "EXCLUIR_SR";
+          selectPeriodo.innerHTML = '<option value="EXCLUIR_SR">Excluir SENT / RESERVA (Por Defecto)</option><option value="TODOS">Ver Todos los Periodos</option>';
+          [...periodosVistos].sort().forEach(per => {
+              selectPeriodo.innerHTML += `<option value="${per}">${per}</option>`;
+          });
+          if ([...periodosVistos, "EXCLUIR_SR", "TODOS"].includes(valActual)) {
+              selectPeriodo.value = valActual;
+          } else {
+              selectPeriodo.value = "EXCLUIR_SR";
+          }
+      }
+
       renderControlInformes();
   }
 
@@ -1835,11 +1881,24 @@
       });
 
       const prestadorSeleccionado = CACHE_DATA.isAdmin ? document.getElementById('doc-admin-prestador').value : null;
+      const selectPeriodoEl = document.getElementById('filter-control-aprobado');
+      const filtroPeriodo = selectPeriodoEl ? selectPeriodoEl.value : "EXCLUIR_SR";
       let pVistos = new Set();
       let rows = '';
+      let totalInformesCount = 0;
+      let pendientesInformesCount = 0;
 
       CACHE_DATA.pacientes.forEach(p => {
           if (prestadorSeleccionado && prestadorSeleccionado !== "TODOS" && p.prestador !== prestadorSeleccionado) return;
+          
+          const periodoAprob = (p.aprobado || '').trim();
+          const periodoUpper = periodoAprob.toUpperCase();
+
+          if (filtroPeriodo === "EXCLUIR_SR") {
+              if (periodoUpper.includes("SENT / SENT") || periodoUpper.includes("RESERVA / RESERVA") || periodoUpper === "SENT" || periodoUpper === "RESERVA") return;
+          } else if (filtroPeriodo !== "TODOS") {
+              if (periodoAprob !== filtroPeriodo) return;
+          }
 
           let partesOS = p.paciente.split('_');
           let osDelPaciente = partesOS.length > 1 ? partesOS[partesOS.length - 1].trim().toUpperCase() : 'PARTICULAR';
@@ -1850,6 +1909,11 @@
           const llaveBusqueda = p.paciente + "_" + especialidadRenglon;
           const inf = informesMap[llaveBusqueda];
           const tieneInforme = !!inf;
+
+          totalInformesCount++;
+          if (!tieneInforme) {
+              pendientesInformesCount++;
+          }
 
           if (VER_SOLO_PENDIENTES && tieneInforme) return;
 
@@ -1892,6 +1956,7 @@
           rows += `<tr class="hover:bg-slate-50 border-b border-gray-100 transition-colors">
               <td class="px-5 py-3 font-bold text-gray-700 text-xs">${p.paciente}</td>
               <td class="px-5 py-3 text-[10px] text-gray-500">${p.prestador}</td>
+              <td class="px-5 py-3 text-[10px] font-semibold text-[#008395]">${periodoAprob || '-'}</td>
               <td class="px-5 py-3 text-center">${statusLabel}</td>
               <td class="px-5 py-3 text-center text-xs text-gray-600">${fecha}</td>
               <td class="px-5 py-3 text-center">${btnAnterior}</td>
@@ -1899,7 +1964,27 @@
           </tr>`;
       });
 
-      tbody.innerHTML = rows || '<tr><td colspan="6" class="text-center py-8 text-gray-400 text-xs">No hay registros.</td></tr>';
+      tbody.innerHTML = rows || '<tr><td colspan="7" class="text-center py-8 text-gray-400 text-xs">No hay registros.</td></tr>';
+      
+      const badgeEl = document.getElementById('badge-pendientes-informes');
+      if (badgeEl) {
+          if (totalInformesCount > 0) {
+              const porcentajePendiente = Math.round((pendientesInformesCount / totalInformesCount) * 100);
+              badgeEl.classList.remove('hidden');
+              badgeEl.classList.add('flex');
+              if (pendientesInformesCount === 0) {
+                  badgeEl.className = "text-[10px] font-bold px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200 flex items-center gap-1 shadow-sm";
+                  badgeEl.innerHTML = `<i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-green-600"></i> Al día: 0 pendientes (0% por subir)`;
+              } else {
+                  badgeEl.className = "text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 shadow-sm";
+                  badgeEl.innerHTML = `<i data-lucide="clock" class="w-3.5 h-3.5 text-amber-600"></i> Pendientes: ${pendientesInformesCount} de ${totalInformesCount} (${porcentajePendiente}% por subir)`;
+              }
+          } else {
+              badgeEl.classList.add('hidden');
+              badgeEl.classList.remove('flex');
+          }
+      }
+
       if(window.lucide) lucide.createIcons();
   }
 
