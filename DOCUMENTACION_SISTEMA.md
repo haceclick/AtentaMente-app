@@ -64,3 +64,37 @@ La tabla de **Estado de Entregas** dentro de la sección de Informes cuenta con 
    - Etiqueta dinámica en la cabecera que calcula en tiempo real:
      $$\text{Porcentaje Pendiente} = \left( \frac{\text{Informes sin subir (columna Última Fecha vacía o '-')}}{\text{Total de informes requeridos del terapeuta}} \right) \times 100$$
    - Se muestra en **ámbar** si existen informes pendientes por realizar o en **verde** si el terapeuta está 100% al día.
+
+---
+
+## 5. Dualidad de Dominios y Rutas de Acceso
+
+El sistema separa estrictamente la capa de presentación (Frontend estático en GitHub Pages) de la lógica de servicios (API REST en Google Apps Script). Es fundamental distinguir ambas direcciones para evitar confusiones operativas:
+
+* **Dominio Oficial de Producción (Frontend Moderno)**: `https://atentamente.haceclick-ai.com` (o su equivalente `https://haceclick.github.io/AtentaMente`).
+  - **Uso Obligatorio para Usuarios**: Todas las sesiones de profesionales, secretaría y administración deben ingresar a través de este dominio aportando su token de sesión en la URL (ej: `https://atentamente.haceclick-ai.com/?uid=TOKEN_USUARIO`).
+  - Aquí es donde se reflejan en tiempo real los cambios de interfaz, tablas modernas, filtros de reportes y validaciones de cliente.
+* **URL Nativa del Script (API Backend / Legacy)**: `https://script.google.com/macros/s/AKfycbz.../exec`
+  - **Uso Exclusivo como Endpoint REST**: Esta dirección solo se utiliza en segundo plano para las peticiones `fetch()` HTTP POST desde `index.html`.
+  - Si un usuario ingresa directamente a esta URL en su navegador (con o sin parámetro `?uid=`), visualizará la **versión heredada precompilada en Google Apps Script**, la cual no refleja los últimos commits ni componentes visuales desarrollados en GitHub.
+
+---
+
+## 6. Protocolo de Resolución de Incidencias en GitHub Pages
+
+Debido a que el frontend se despliega automáticamente en la infraestructura de GitHub, pueden ocurrir atascos ocasionales en la cola de servidores o errores de tiempo de espera (`Timeout reached, aborting!`) durante la construcción del sitio.
+
+### A. Migración al Motor Moderno (`GitHub Actions`)
+Para evitar los fallos y demoras recurrentes del motor heredado de GitHub (*"Deploy from a branch"*), el repositorio incluye el archivo de flujo de trabajo `.github/workflows/static.yml`.
+
+**Configuración en Repositorio**:
+1. Ir a la pestaña **Settings** (Configuración) -> menú izquierdo **Pages**.
+2. En **Build and deployment -> Source**, cambiar el desplegable a **"GitHub Actions"**.
+3. Al guardar, GitHub ejecuta el flujo optimizado (`Deploy static content to Pages`), que sube los artefactos estáticos en pocos segundos sin pasar por la cola de construcción interna heredada.
+
+### B. Procedimiento de Destrabe Rápido (*Toggle Reset*)
+Si una ejecución queda colgada en estado `Queued` o arroja el error *"Falló al cancelar"* en la pestaña **Actions**:
+1. Entrar a **Settings -> Pages**.
+2. Alternar temporalmente la opción **Source** (ej: cambiar de *"Deploy from a branch"* a *"GitHub Actions"*, o viceversa).
+3. Guardar el cambio, esperar 10 segundos y restaurar la opción deseada.
+4. Este cambio destruye el bloqueo interno (*deadlock*) del entorno `github-pages` en los servidores de GitHub y fuerza un nuevo despliegue limpio e inmediato.
