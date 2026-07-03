@@ -259,7 +259,7 @@ function getAppData(tokenDelFrontend) {
     if (sheetDocs) {
         const dDocs = sheetDocs.getDataRange().getDisplayValues();
         if (dDocs.length > 1) {
-            docClinicos = dDocs.slice(1).map(r => ({ fecha: r[1], tipo: r[2], especialidad: r[3], paciente: r[4], prestador: r[5], url: r[6] }));
+            docClinicos = dDocs.slice(1).map(r => ({ fecha: r[1], tipo: r[2], especialidad: r[3], paciente: r[4], prestador: r[5], url: r[6], html: r[7] || "" }));
         }
     }
 
@@ -908,17 +908,23 @@ function getUltimoInforme(paciente, prestador, especialidad, tipo) {
     const sheetDocs = ss.getSheetByName('Documentos_Clinicos');
     const dataDocs = sheetDocs.getDataRange().getValues();
 
-    // Buscamos de abajo hacia arriba para encontrar el más reciente
+    const isInforme = String(tipo).startsWith("Informe");
+
     for (let i = dataDocs.length - 1; i >= 1; i--) {
-        // [2]: Tipo, [3]: Especialidad, [4]: Paciente, [5]: Prestador, [7]: Columna H (Texto editable)
-        if (dataDocs[i][4] === paciente && dataDocs[i][2] === tipo && dataDocs[i][3] === especialidad && dataDocs[i][5] === prestador) {
-            const htmlGuardado = dataDocs[i][7];
-            if (htmlGuardado) {
+        const rowTipo = String(dataDocs[i][2] || "").trim();
+        const rowEsp = String(dataDocs[i][3] || "").trim();
+        const rowPac = String(dataDocs[i][4] || "").trim();
+        const htmlGuardado = dataDocs[i][7];
+
+        const tipoCoincide = isInforme ? rowTipo.startsWith("Informe") : (rowTipo === tipo);
+        
+        if (rowPac === paciente && tipoCoincide && (rowEsp === especialidad || !especialidad || especialidad === "General" || rowEsp === "General")) {
+            if (htmlGuardado && String(htmlGuardado).trim() !== "") {
                 return { success: true, html: htmlGuardado };
             }
         }
     }
-    return { success: false, message: "No se encontró un informe anterior editable." };
+    return { success: false, message: "No se encontró un informe anterior con texto editable en la planilla." };
   } catch (e) {
     return { error: e.message };
   }
