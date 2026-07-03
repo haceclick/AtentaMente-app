@@ -2215,16 +2215,30 @@
       textarea.focus();
   }
 
-  function obtenerTemplateBase(tipo) {
-      let infoRef = CACHE_DATA.currentUserInfo;
-      
+  function resolverInfoPrestador(pacienteObj) {
+      let infoRef = Object.assign({}, CACHE_DATA.currentUserInfo);
       if (CACHE_DATA.isAdmin) {
-          const prestadorSel = document.getElementById('doc-admin-prestador').value;
-          if (prestadorSel && prestadorSel !== "TODOS" && CACHE_DATA.prestadoresInfo[prestadorSel]) {
-              infoRef = CACHE_DATA.prestadoresInfo[prestadorSel];
+          const prestadorSel = document.getElementById('doc-admin-prestador') ? document.getElementById('doc-admin-prestador').value : null;
+          let nombreBuscar = null;
+          if (prestadorSel && prestadorSel !== "TODOS") {
+              nombreBuscar = prestadorSel;
+          } else if (pacienteObj && pacienteObj.prestador) {
+              nombreBuscar = pacienteObj.prestador;
+          }
+          if (nombreBuscar) {
+              if (CACHE_DATA.prestadoresInfo && CACHE_DATA.prestadoresInfo[nombreBuscar]) {
+                  infoRef = Object.assign({}, CACHE_DATA.prestadoresInfo[nombreBuscar]);
+              }
+              infoRef.nombre = nombreBuscar;
           }
       }
+      return infoRef;
+  }
 
+  function obtenerTemplateBase(tipo) {
+      const pacienteIdx = document.getElementById('doc-paciente') ? document.getElementById('doc-paciente').value : null;
+      const p = pacienteIdx ? CACHE_DATA.pacientes[pacienteIdx] : null;
+      const infoRef = resolverInfoPrestador(p);
       const especialidadExacta = normalizarEspecialidad(infoRef);
 
       let tempPersonalizado = misTemplates.find(t => {
@@ -2268,13 +2282,7 @@
       
       let texto = obtenerTemplateBase(tipo);
 
-      let infoRef = CACHE_DATA.currentUserInfo;
-      if (CACHE_DATA.isAdmin) {
-          const sel = document.getElementById('doc-admin-prestador').value;
-          if (sel !== "TODOS" && CACHE_DATA.prestadoresInfo[sel]) {
-              infoRef = CACHE_DATA.prestadoresInfo[sel];
-          }
-      }
+      const infoRef = resolverInfoPrestador(p);
       const especialidadFinal = normalizarEspecialidad(infoRef);
 
       let partesOS = p.paciente.split('_');
@@ -2313,13 +2321,9 @@
       const btn = document.getElementById('btn-save-doc');
       if(!html.trim()) return showToast("El documento está vacío", "error");
       
-      let infoRef = CACHE_DATA.currentUserInfo;
-      if (CACHE_DATA.isAdmin) {
-          const prestadorSel = document.getElementById('doc-admin-prestador').value;
-          if (prestadorSel && prestadorSel !== "TODOS" && CACHE_DATA.prestadoresInfo[prestadorSel]) {
-              infoRef = CACHE_DATA.prestadoresInfo[prestadorSel];
-          }
-      }
+      const pacienteIdx = document.getElementById('doc-paciente').value;
+      const p = pacienteIdx ? CACHE_DATA.pacientes[pacienteIdx] : null;
+      const infoRef = resolverInfoPrestador(p);
 
       let finalPrestador = obtenerNombreRealPrestador(infoRef.nombre || CACHE_DATA.currentUserInfo.nombre);
       let finalTitulo = infoRef.titulo || "";
@@ -2430,13 +2434,7 @@
       const p = pacienteIdx ? CACHE_DATA.pacientes[pacienteIdx] : { paciente: '[PACIENTE]', dni: '[DNI]', aprobado: '-' };
       const tipo = document.getElementById('doc-tipo').value;
 
-      let infoRef = CACHE_DATA.currentUserInfo;
-      if (CACHE_DATA.isAdmin) {
-          const prestadorSel = document.getElementById('doc-admin-prestador').value;
-          if (prestadorSel && prestadorSel !== "TODOS" && CACHE_DATA.prestadoresInfo[prestadorSel]) {
-              infoRef = CACHE_DATA.prestadoresInfo[prestadorSel];
-          }
-      }
+      const infoRef = resolverInfoPrestador(p);
 
       let finalPrestador = obtenerNombreRealPrestador(infoRef.nombre || CACHE_DATA.currentUserInfo.nombre);
       let finalTitulo = infoRef.titulo || "";
@@ -2573,10 +2571,7 @@
   function triggerUploadPropio(paciente, idDrive, prestador) {
       if(!idDrive || idDrive.length < 5) return showToast("El paciente no tiene carpeta de Drive vinculada.", "error");
       
-      let infoRef = CACHE_DATA.currentUserInfo;
-      if (CACHE_DATA.isAdmin && prestador && CACHE_DATA.prestadoresInfo[prestador]) {
-           infoRef = CACHE_DATA.prestadoresInfo[prestador];
-      }
+      const infoRef = resolverInfoPrestador({ prestador });
       let finalEspecialidad = normalizarEspecialidad(infoRef);
       
       UPLOAD_PROPIO_DATA = { paciente, idDrive, prestador, especialidad: finalEspecialidad };
@@ -2695,13 +2690,7 @@
       const p = CACHE_DATA.pacientes[pacienteIdx];
       const tipo = document.getElementById('doc-tipo').value;
       
-      let infoRef = CACHE_DATA.currentUserInfo;
-      if (CACHE_DATA.isAdmin) {
-          const prestadorSel = document.getElementById('doc-admin-prestador').value;
-          if (prestadorSel && prestadorSel !== "TODOS" && CACHE_DATA.prestadoresInfo[prestadorSel]) {
-              infoRef = CACHE_DATA.prestadoresInfo[prestadorSel];
-          }
-      }
+      const infoRef = resolverInfoPrestador(p);
       
       let finalPrestador = obtenerNombreRealPrestador(infoRef.nombre || CACHE_DATA.currentUserInfo.nombre);
       let finalEspecialidad = normalizarEspecialidad(infoRef);

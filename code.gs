@@ -245,6 +245,7 @@ function getAppData(tokenDelFrontend) {
                 else if (this.nombreToFirma && this.nombreToFirma[String(pres).toLowerCase().trim()]) fUrl = this.nombreToFirma[String(pres).toLowerCase().trim()];
 
                 prestadoresInfo[pres] = {
+                    nombre: pres,
                     titulo: (idxTituloPrestador > -1) ? dataDatos[i][idxTituloPrestador] : '',
                     matricula: (idxMatricula > -1) ? dataDatos[i][idxMatricula] : '',
                     firmaUrl: fUrl
