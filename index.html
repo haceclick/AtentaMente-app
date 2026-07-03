@@ -660,6 +660,15 @@
 
   // 2. NUESTRO PUENTE DE COMUNICACIÓN
   function llamarBackend(accion, parametros, funcionExito, funcionError) {
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      const runner = google.script.run
+        .withSuccessHandler(res => { if (funcionExito) funcionExito(res); })
+        .withFailureHandler(err => { if (funcionError) funcionError(err); });
+      if (typeof runner[accion] === 'function') {
+        runner[accion].apply(runner, parametros || []);
+        return;
+      }
+    }
     fetch(GOOGLE_SCRIPT_URL, {
       redirect: "follow", 
       method: 'POST',
