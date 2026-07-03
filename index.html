@@ -464,8 +464,10 @@
                       <div class="grid grid-cols-2 gap-3">
                           <div class="col-span-2">
                               <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tipo</label>
-                              <select id="doc-tipo" class="w-full p-2 border border-slate-200 rounded text-xs focus:border-[#008395] outline-none">
-                                  <option value="Informe">Informe</option>
+                              <select id="doc-tipo" onchange="alCambiarTipoDoc()" class="w-full p-2 border border-slate-200 rounded text-xs focus:border-[#008395] outline-none">
+                                  <option value="Informe Junio">Informe Junio</option>
+                                  <option value="Informe Diciembre">Informe Diciembre</option>
+                                  <option value="Informe">Informe (General)</option>
                                   <option value="Plan de Tratamiento">Plan de Tratamiento</option>
                                   <option value="Presupuesto">Presupuesto</option>
                               </select>
@@ -718,9 +720,10 @@
 
       const selectTipoDoc = document.getElementById('doc-tipo');
       if (selectTipoDoc) {
-          selectTipoDoc.value = "Informe"; 
-          selectTipoDoc.disabled = true; 
-          selectTipoDoc.classList.add('bg-slate-100', 'text-slate-500', 'cursor-not-allowed'); 
+          const today = new Date();
+          selectTipoDoc.value = ((today.getMonth() + 1) <= 6) ? "Informe Junio" : "Informe Diciembre"; 
+          selectTipoDoc.disabled = false; 
+          selectTipoDoc.classList.remove('bg-slate-100', 'text-slate-500', 'cursor-not-allowed'); 
       }
     }
     
@@ -733,6 +736,10 @@
         const today = new Date();
         const isPrimer = (today.getMonth() + 1) <= 6;
         docFecha.value = isPrimer ? `${today.getFullYear()}-06-30` : `${today.getFullYear()}-12-31`;
+        const selectTipoDoc = document.getElementById('doc-tipo');
+        if (selectTipoDoc && !selectTipoDoc.value) {
+            selectTipoDoc.value = isPrimer ? "Informe Junio" : "Informe Diciembre";
+        }
     }
 
     cargarPacientesDoc();
@@ -2032,6 +2039,60 @@
       return str; 
   }
 
+  function alCambiarTipoDoc() {
+      const selectTipo = document.getElementById('doc-tipo');
+      const docFecha = document.getElementById('doc-fecha');
+      if (!selectTipo || !docFecha) return;
+      const today = new Date();
+      const anio = today.getFullYear();
+      if (selectTipo.value === "Informe Junio") {
+          docFecha.value = `${anio}-06-30`;
+      } else if (selectTipo.value === "Informe Diciembre") {
+          docFecha.value = `${anio}-12-31`;
+      }
+  }
+
+  function calcularPeriodoEvaluadoTexto(aprobadoVal, tipoDoc) {
+      if (!aprobadoVal || aprobadoVal === '-' || String(aprobadoVal).trim() === '') {
+          let today = new Date();
+          let isPrimer = (tipoDoc === 'Informe Junio') || (tipoDoc === 'Informe' && (today.getMonth() + 1) <= 6);
+          let anio = today.getFullYear();
+          return isPrimer ? `Enero ${anio} a Junio ${anio}` : `Junio ${anio} a Diciembre ${anio}`;
+      }
+      
+      let val = String(aprobadoVal).trim();
+      let partes = val.split('/').map(p => p.trim());
+      
+      let pInicio = partes[0] || "";
+      let pFin = partes[1] || partes[0] || "";
+      
+      let isJunio = (tipoDoc === 'Informe Junio') || (tipoDoc === 'Informe' && (new Date().getMonth() + 1) <= 6);
+      let isDiciembre = (tipoDoc === 'Informe Diciembre') || (tipoDoc === 'Informe' && (new Date().getMonth() + 1) > 6);
+      
+      if (isJunio) {
+          if (pFin.toLowerCase().startsWith('dic')) {
+              let anioMatch = pFin.match(/\d{2,4}/);
+              let anio = anioMatch ? anioMatch[0] : new Date().getFullYear().toString().slice(-2);
+              pFin = `jun-${anio}`;
+          }
+      }
+      
+      if (isDiciembre) {
+          let lowerInicio = pInicio.toLowerCase();
+          if (lowerInicio.startsWith('ene') || lowerInicio.startsWith('feb') || lowerInicio.startsWith('mar') || lowerInicio.startsWith('abr') || lowerInicio.startsWith('may')) {
+              let anioMatch = pInicio.match(/\d{2,4}/);
+              let anio = anioMatch ? anioMatch[0] : new Date().getFullYear().toString().slice(-2);
+              pInicio = `jun-${anio}`;
+          }
+      }
+      
+      let textoInicio = formatearPeriodo(pInicio);
+      let textoFin = formatearPeriodo(pFin);
+      
+      if (textoInicio === textoFin) return textoInicio;
+      return `${textoInicio} a ${textoFin}`;
+  }
+
   function insertarEnEditor(open, close) {
       const textarea = document.getElementById('doc-editor-area');
       const start = textarea.selectionStart; const end = textarea.selectionEnd; const text = textarea.value;
@@ -2051,12 +2112,18 @@
 
       const especialidadExacta = normalizarEspecialidad(infoRef);
 
-      const tempPersonalizado = misTemplates.find(t => {
+      let tempPersonalizado = misTemplates.find(t => {
           return (t.tipo || "").trim() === tipo.trim() && 
                  (t.especialidad || "").trim() === especialidadExacta;
       });
-      
-      return tempPersonalizado ? tempPersonalizado.html : TEXTOS_BASE[tipo];
+      if (!tempPersonalizado && tipo.startsWith("Informe")) {
+          tempPersonalizado = misTemplates.find(t => {
+              return (t.tipo || "").trim() === "Informe" && 
+                     (t.especialidad || "").trim() === especialidadExacta;
+          });
+      }
+      const tipoBase = tipo.startsWith("Informe") ? "Informe" : tipo;
+      return tempPersonalizado ? tempPersonalizado.html : TEXTOS_BASE[tipoBase];
   }
 
   function abrirEditorTemplate() {
@@ -2107,12 +2174,7 @@
           if(btnPrev) btnPrev.classList.remove('hidden');
       }
       
-      let aprobadoVal = String(p.aprobado || "");
-      let mesInicioRaw = aprobadoVal.includes('/') ? aprobadoVal.split('/')[0].trim() : aprobadoVal.trim();
-      let mesInicio = formatearPeriodo(mesInicioRaw);
-      let isPrimerSem = (new Date().getMonth() + 1) <= 6;
-      let mesFin = (isPrimerSem ? "Junio " : "Diciembre ") + new Date().getFullYear();
-      periodoEvaluadoGlobal = `${mesInicio} a ${mesFin}`;
+      periodoEvaluadoGlobal = calcularPeriodoEvaluadoTexto(p.aprobado, tipo);
 
       texto = texto.replace(/\[PACIENTE\]/g, p.paciente);
       texto = texto.replace(/\[DNI\]/g, p.dni || "S/D");
@@ -2274,12 +2336,8 @@
           fechaDocFinal = `${parts[2]}/${parts[1]}/${parts[0]}`;
       }
 
-      let aprobadoVal = String(p.aprobado || "");
-      let mesInicioRaw = aprobadoVal.includes('/') ? aprobadoVal.split('/')[0].trim() : aprobadoVal.trim();
-      let mesInicio = formatearPeriodo(mesInicioRaw);
-      let isPrimerSem = (new Date().getMonth() + 1) <= 6;
-      let mesFin = (isPrimerSem ? "Junio " : "Diciembre ") + new Date().getFullYear();
-      let periodoPrev = `${mesInicio} a ${mesFin}`;
+      const tipoSel = document.getElementById('doc-tipo') ? document.getElementById('doc-tipo').value : 'Informe';
+      let periodoPrev = calcularPeriodoEvaluadoTexto(p.aprobado, tipoSel);
 
       let firmaHtml = '<br><span style="color:#999; font-size:10px;">[Sin firma cargada]</span><br>';
       let hasFirma = false;
