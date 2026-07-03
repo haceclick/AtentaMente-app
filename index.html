@@ -535,9 +535,27 @@
                       <span id="badge-pendientes-informes" class="hidden text-[11px] font-bold px-2.5 py-1 rounded-full items-center gap-1 shadow-sm"></span>
                   </div>
                   <div class="flex items-center gap-2 flex-wrap">
-                      <select id="filter-control-aprobado" onchange="renderControlInformes()" class="bg-white border border-slate-200 text-slate-600 px-2.5 py-1.5 rounded text-[10px] font-bold uppercase hover:border-slate-300 focus:outline-none focus:border-[#008395] transition-colors shadow-sm">
-                          <option value="EXCLUIR_SR">Excluir SENT / RESERVA (Por Defecto)</option>
-                          <option value="TODOS">Ver Todos los Periodos</option>
+                      <div class="relative inline-block text-left" id="container-periodo-filter">
+                          <button type="button" onclick="toggleDropdownPeriodo(event)" id="btn-dropdown-periodo" class="bg-white border border-slate-200 text-slate-600 px-2.5 py-1.5 rounded text-[10px] font-bold uppercase hover:border-slate-300 focus:outline-none transition-colors shadow-sm flex items-center gap-1.5">
+                              <i data-lucide="calendar" class="w-3 h-3 text-[#008395]"></i>
+                              <span>Periodo: <span id="label-periodo-filter" class="text-[#008395]">Por Defecto</span></span>
+                              <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400"></i>
+                          </button>
+                          <div id="panel-dropdown-periodo" class="hidden origin-top-right absolute right-0 mt-1 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 p-2.5 text-xs">
+                              <div class="flex items-center justify-between pb-2 mb-2 border-b border-gray-100">
+                                  <button type="button" onclick="accPeriodoFilter('defecto')" class="text-[10px] font-bold text-[#008395] hover:underline">Defecto (Sin SR)</button>
+                                  <button type="button" onclick="accPeriodoFilter('todos')" class="text-[10px] font-bold text-gray-500 hover:underline">Todos</button>
+                                  <button type="button" onclick="accPeriodoFilter('ninguno')" class="text-[10px] font-bold text-red-500 hover:underline">Ninguno</button>
+                              </div>
+                              <div id="list-checkboxes-periodo" class="max-h-52 overflow-y-auto space-y-1.5 pr-1"></div>
+                          </div>
+                      </div>
+                      <select id="filter-control-estado" onchange="renderControlInformes()" class="bg-white border border-slate-200 text-slate-600 px-2.5 py-1.5 rounded text-[10px] font-bold uppercase hover:border-slate-300 focus:outline-none focus:border-[#008395] transition-colors shadow-sm">
+                          <option value="TODOS">Estado: Todos</option>
+                          <option value="SI">Estado: SÍ (Entregado)</option>
+                          <option value="NO">Estado: NO (Pendiente)</option>
+                          <option value="ENTREGADO">Estado: ENTREGADO (Propio)</option>
+                          <option value="PROPIO">Estado: PROPIO (Pend. Subida)</option>
                       </select>
                       <button onclick="togglePendientesInformes()" id="btn-toggle-pendientes-inf" class="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded text-[10px] font-bold uppercase hover:bg-slate-50 transition-colors shadow-sm"><i data-lucide="filter" class="w-3 h-3 inline mr-1"></i> Ver Solo Pendientes</button>
                   </div>
@@ -1834,19 +1852,7 @@
           }
       });
 
-      const selectPeriodo = document.getElementById('filter-control-aprobado');
-      if (selectPeriodo) {
-          const valActual = selectPeriodo.value || "EXCLUIR_SR";
-          selectPeriodo.innerHTML = '<option value="EXCLUIR_SR">Excluir SENT / RESERVA (Por Defecto)</option><option value="TODOS">Ver Todos los Periodos</option>';
-          [...periodosVistos].sort().forEach(per => {
-              selectPeriodo.innerHTML += `<option value="${per}">${per}</option>`;
-          });
-          if ([...periodosVistos, "EXCLUIR_SR", "TODOS"].includes(valActual)) {
-              selectPeriodo.value = valActual;
-          } else {
-              selectPeriodo.value = "EXCLUIR_SR";
-          }
-      }
+      actualizarCheckboxesPeriodo([...periodosVistos].sort());
 
       renderControlInformes();
   }
@@ -1869,6 +1875,109 @@
       renderControlInformes();
   }
 
+  let periodosActivosSet = null;
+
+  function actualizarCheckboxesPeriodo(periodos) {
+      const listEl = document.getElementById('list-checkboxes-periodo');
+      if (!listEl) return;
+      
+      if (periodosActivosSet === null) {
+          periodosActivosSet = new Set();
+          periodos.forEach(per => {
+              const upper = per.toUpperCase();
+              if (!upper.includes("SENT") && !upper.includes("RESERVA")) {
+                  periodosActivosSet.add(per);
+              }
+          });
+      }
+      
+      let html = '';
+      periodos.forEach(per => {
+          const checked = periodosActivosSet.has(per) ? 'checked' : '';
+          const enc = encodeURIComponent(per);
+          html += `
+          <label class="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded cursor-pointer text-[11px] text-gray-700 select-none">
+              <input type="checkbox" onchange="cambiarCheckboxPeriodo('${enc}', this.checked)" ${checked} class="rounded border-gray-300 text-[#008395] focus:ring-[#008395] w-3.5 h-3.5">
+              <span class="truncate">${per}</span>
+          </label>`;
+      });
+      listEl.innerHTML = html;
+      actualizarLabelPeriodo();
+  }
+
+  function cambiarCheckboxPeriodo(perEncoded, isChecked) {
+      const per = decodeURIComponent(perEncoded);
+      if (periodosActivosSet === null) periodosActivosSet = new Set();
+      if (isChecked) {
+          periodosActivosSet.add(per);
+      } else {
+          periodosActivosSet.delete(per);
+      }
+      actualizarLabelPeriodo();
+      renderControlInformes();
+  }
+
+  function accPeriodoFilter(accion) {
+      if (periodosActivosSet === null) periodosActivosSet = new Set();
+      const checkboxes = document.querySelectorAll('#list-checkboxes-periodo input[type="checkbox"]');
+      if (accion === 'defecto') {
+          periodosActivosSet.clear();
+          checkboxes.forEach(chk => {
+              const labelEl = chk.closest('label');
+              const txt = labelEl ? labelEl.textContent.trim().toUpperCase() : '';
+              if (!txt.includes("SENT") && !txt.includes("RESERVA")) {
+                  chk.checked = true;
+                  periodosActivosSet.add(labelEl.textContent.trim());
+              } else {
+                  chk.checked = false;
+              }
+          });
+      } else if (accion === 'todos') {
+          checkboxes.forEach(chk => {
+              chk.checked = true;
+              const labelEl = chk.closest('label');
+              if (labelEl) periodosActivosSet.add(labelEl.textContent.trim());
+          });
+      } else if (accion === 'ninguno') {
+          periodosActivosSet.clear();
+          checkboxes.forEach(chk => chk.checked = false);
+      }
+      actualizarLabelPeriodo();
+      renderControlInformes();
+  }
+
+  function actualizarLabelPeriodo() {
+      const labelEl = document.getElementById('label-periodo-filter');
+      if (!labelEl) return;
+      const totalCheckboxes = document.querySelectorAll('#list-checkboxes-periodo input[type="checkbox"]').length;
+      if (!periodosActivosSet || periodosActivosSet.size === 0) {
+          labelEl.textContent = "Ninguno";
+      } else if (periodosActivosSet.size === totalCheckboxes && totalCheckboxes > 0) {
+          labelEl.textContent = "Todos";
+      } else {
+          labelEl.textContent = `${periodosActivosSet.size} sel.`;
+      }
+  }
+
+  function toggleDropdownPeriodo(e) {
+      e.stopPropagation();
+      const panel = document.getElementById('panel-dropdown-periodo');
+      if (panel) {
+          panel.classList.toggle('hidden');
+          if (!panel.classList.contains('hidden')) {
+              lucide.createIcons();
+          }
+      }
+  }
+
+  document.addEventListener('click', function(e) {
+      const container = document.getElementById('container-periodo-filter');
+      const panel = document.getElementById('panel-dropdown-periodo');
+      if (container && panel && !container.contains(e.target)) {
+          panel.classList.add('hidden');
+      }
+  });
+
   function renderControlInformes() {
       const tbody = document.getElementById('tbody-control-informes');
       if (!tbody) return;
@@ -1888,23 +1997,23 @@
       });
 
       const prestadorSeleccionado = CACHE_DATA.isAdmin ? document.getElementById('doc-admin-prestador').value : null;
-      const selectPeriodoEl = document.getElementById('filter-control-aprobado');
-      const filtroPeriodo = selectPeriodoEl ? selectPeriodoEl.value : "EXCLUIR_SR";
       let pVistos = new Set();
       let rows = '';
       let totalInformesCount = 0;
       let pendientesInformesCount = 0;
 
+      const selectEstadoEl = document.getElementById('filter-control-estado');
+      const filtroEstado = selectEstadoEl ? selectEstadoEl.value : "TODOS";
+
       CACHE_DATA.pacientes.forEach(p => {
           if (prestadorSeleccionado && prestadorSeleccionado !== "TODOS" && p.prestador !== prestadorSeleccionado) return;
           
           const periodoAprob = (p.aprobado || '').trim();
-          const periodoUpper = periodoAprob.toUpperCase();
-
-          if (filtroPeriodo === "EXCLUIR_SR") {
+          if (periodosActivosSet !== null) {
+              if (!periodosActivosSet.has(periodoAprob)) return;
+          } else {
+              const periodoUpper = periodoAprob.toUpperCase();
               if (periodoUpper.includes("SENT") || periodoUpper.includes("RESERVA")) return;
-          } else if (filtroPeriodo !== "TODOS") {
-              if (periodoAprob !== filtroPeriodo) return;
           }
 
           let partesOS = p.paciente.split('_');
@@ -1923,6 +2032,9 @@
           }
 
           if (VER_SOLO_PENDIENTES && tieneInforme) return;
+
+          let estadoClean = statusOS === 'PROPIO' ? (tieneInforme ? 'ENTREGADO' : 'PROPIO') : (tieneInforme ? 'SI' : 'NO');
+          if (filtroEstado !== "TODOS" && estadoClean !== filtroEstado) return;
 
           let statusLabel = '';
           let actionHtml = '-';
