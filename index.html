@@ -2048,7 +2048,7 @@
                   statusLabel = `<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-300">ENTREGADO</span>`;
                   actionHtml = `
                   <div class="flex items-center justify-center gap-1">
-                      <button onclick="abrirCarpetaInformesDirecta('${p.idDrive}', '${p.paciente}')" class="p-1.5 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Ver Informe Especial"><i data-lucide="folder-search" class="w-4 h-4"></i></button>
+                      <button onclick="abrirCarpetaInformesDirecta('${p.idDrive}', '${p.paciente}', '${inf ? inf.tipo : (p.aprobado || '')}')" class="p-1.5 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Ver Informe Especial"><i data-lucide="folder-search" class="w-4 h-4"></i></button>
                       <button onclick="borrarInformeControl('${p.paciente}', '${especialidadRenglon}')" class="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors" title="Eliminar Informe"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                   </div>`;
               } else {
@@ -2064,7 +2064,7 @@
                   statusLabel = `<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold border border-green-300">SÍ</span>`;
                   actionHtml = `
                   <div class="flex items-center justify-center gap-1">
-                      <button onclick="abrirCarpetaInformesDirecta('${p.idDrive}', '${p.paciente}')" class="p-1.5 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Ver Informe"><i data-lucide="folder-search" class="w-4 h-4"></i></button>
+                      <button onclick="abrirCarpetaInformesDirecta('${p.idDrive}', '${p.paciente}', '${inf ? inf.tipo : (p.aprobado || '')}')" class="p-1.5 text-[#008395] hover:bg-teal-50 rounded transition-colors" title="Ver Informe"><i data-lucide="folder-search" class="w-4 h-4"></i></button>
                       <button onclick="borrarInformeControl('${p.paciente}', '${especialidadRenglon}')" class="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors" title="Eliminar Informe"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                   </div>`;
               } else {
@@ -2543,16 +2543,21 @@
       });
   }
 
-  function abrirCarpetaInformesDirecta(idRoot, pacienteNombre) {
+  function abrirCarpetaInformesDirecta(idRoot, pacienteNombre, tipoRef) {
       const anioActual = new Date().getFullYear();
-      const isPrimerSemestre = (new Date().getMonth() + 1) <= 6;
-      const nombreSemestre = isPrimerSemestre ? "Informes_semestrales_Junio" : "Informes_semestrales_Diciembre";
+      let esJunio = (new Date().getMonth() + 1) <= 6;
+      if (tipoRef) {
+          const tUpper = String(tipoRef).toUpperCase();
+          if (tUpper.includes("JUN") || tUpper.includes("06")) esJunio = true;
+          else if (tUpper.includes("DIC") || tUpper.includes("12")) esJunio = false;
+      }
+      const nombreSemestre = esJunio ? "Informes_semestrales_Junio" : "Informes_semestrales_Diciembre";
       
       const rutaSubcarpeta = anioActual + "/" + nombreSemestre;
 
       document.querySelectorAll('.view-div').forEach(function(v) { v.classList.add('hidden'); });
       document.getElementById('view-browser').classList.remove('hidden');
-      document.getElementById('browser-title').innerText = "Informes " + (isPrimerSemestre ? "Junio" : "Diciembre") + ": " + pacienteNombre;
+      document.getElementById('browser-title').innerText = "Informes " + (esJunio ? "Junio" : "Diciembre") + ": " + pacienteNombre;
       
       IS_LIST_VIEW = true;
       EXIT_VIEW = 'docclinica';

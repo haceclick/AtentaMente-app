@@ -737,8 +737,15 @@ function guardarDocumentoClinico(payload) {
     let yearFolder; const yfs = patientFolder.getFoldersByName(anioActual);
     if(yfs.hasNext()) yearFolder = yfs.next(); else yearFolder = patientFolder.createFolder(anioActual);
     
-    const isPrimerSemestre = (new Date().getMonth() + 1) <= 6;
-    const nombreSemestre = isPrimerSemestre ? "Informes_semestrales_Junio" : "Informes_semestrales_Diciembre";
+    let nombreSemestre;
+    if (payload.tipo && (payload.tipo.includes("Junio") || payload.tipo === "Informe Junio")) {
+        nombreSemestre = "Informes_semestrales_Junio";
+    } else if (payload.tipo && (payload.tipo.includes("Diciembre") || payload.tipo === "Informe Diciembre")) {
+        nombreSemestre = "Informes_semestrales_Diciembre";
+    } else {
+        const isPrimerSemestre = (new Date().getMonth() + 1) <= 6;
+        nombreSemestre = isPrimerSemestre ? "Informes_semestrales_Junio" : "Informes_semestrales_Diciembre";
+    }
     let semFolder; const sfs = yearFolder.getFoldersByName(nombreSemestre);
     if(sfs.hasNext()) semFolder = sfs.next(); else semFolder = yearFolder.createFolder(nombreSemestre);
     
@@ -786,7 +793,7 @@ function guardarDocumentoClinico(payload) {
     </div></body></html>`;
     
     // Quitamos acentos y respetamos los espacios originales (con trim() para limpiar bordes)
-    const nombrePacienteLimpio = payload.paciente.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const nombrePacienteLimpio = payload.paciente.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
     const nombreEspecialidadLimpia = payload.especialidad.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
     const nombreArchivo = `${payload.tipo}_${nombrePacienteLimpio}_${nombreEspecialidadLimpia}.pdf`;
     const blob = Utilities.newBlob(htmlContent, MimeType.HTML).setName(nombreArchivo).getAs(MimeType.PDF);
