@@ -661,38 +661,72 @@
   // 2. NUESTRO PUENTE DE COMUNICACIÓN
   function llamarBackend(accion, parametros, funcionExito, funcionError) {
     if (typeof google !== 'undefined' && google.script && google.script.run) {
-      const runner = google.script.run
-        .withSuccessHandler(res => { if (funcionExito) funcionExito(res); })
-        .withFailureHandler(err => { if (funcionError) funcionError(err); });
-      if (typeof runner[accion] === 'function') {
-        runner[accion].apply(runner, parametros || []);
+        let runner = google.script.run;
+        if (funcionExito) runner = runner.withSuccessHandler(funcionExito);
+        if (funcionError) runner = runner.withFailureHandler(funcionError);
+        runner[accion].apply(runner, parametros);
         return;
-      }
     }
-    fetch(GOOGLE_SCRIPT_URL, {
-      redirect: "follow", 
-      method: 'POST',
-      credentials: 'omit',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ accion: accion, parametros: parametros })
-    })
-    .then(async respuesta => {
-      if (!respuesta.ok) {
-        throw new Error("Error en servidor (" + respuesta.status + "): Intente recargar la página.");
-      }
-      return respuesta.json();
-    })
-    .then(datos => {
-      if (datos.estado === 'exito') {
-        if (funcionExito) funcionExito(datos.respuesta);
-      } else {
-        if (funcionError) funcionError(new Error(datos.mensaje));
-      }
-    })
-    .catch(error => {
-      console.error("Error conectando con backend:", error);
-      if (funcionError) funcionError(error);
+
+    // Usamos el hack del iframe oculto y postMessage para evitar el 404 de CORS de Google Apps Script
+    const payload = JSON.stringify({
+        accion: accion,
+        parametros: parametros,
+        usePostMessage: true
     });
+
+    const iframeName = 'gas_iframe_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+    
+    const iframe = document.createElement('iframe');
+    iframe.name = iframeName;
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = GOOGLE_SCRIPT_URL;
+    form.target = iframeName;
+    form.style.display = 'none';
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = payload;
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+
+    const messageHandler = function(event) {
+        // Ignoramos mensajes que no sean del iframe que acabamos de crear
+        // Google envía todo como string JSON o un objeto
+        if (!event.data) return;
+        
+        let response;
+        try {
+            response = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        } catch (e) {
+            return; // No es nuestro mensaje
+        }
+
+        // Verificamos que sea nuestra respuesta
+        if (response && (response.estado === 'exito' || response.estado === 'error')) {
+            window.removeEventListener('message', messageHandler);
+            setTimeout(() => {
+                if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+                if (form.parentNode) form.parentNode.removeChild(form);
+            }, 1000);
+
+            if (response.estado === 'exito') {
+                if (funcionExito) funcionExito(response.respuesta);
+            } else {
+                if (funcionError) funcionError(response.mensaje);
+                else console.error("Error del backend:", response.mensaje);
+            }
+        }
+    };
+
+    window.addEventListener('message', messageHandler);
+    form.submit();
   }
 
   // 3. EL NUEVO ARRANQUE DE LA APP
