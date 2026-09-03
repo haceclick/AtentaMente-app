@@ -672,10 +672,16 @@
     fetch(GOOGLE_SCRIPT_URL, {
       redirect: "follow", 
       method: 'POST',
+      credentials: 'omit',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ accion: accion, parametros: parametros })
     })
-    .then(respuesta => respuesta.json())
+    .then(async respuesta => {
+      if (!respuesta.ok) {
+        throw new Error("Error en servidor (" + respuesta.status + "): Intente recargar la página.");
+      }
+      return respuesta.json();
+    })
     .then(datos => {
       if (datos.estado === 'exito') {
         if (funcionExito) funcionExito(datos.respuesta);
@@ -684,6 +690,7 @@
       }
     })
     .catch(error => {
+      console.error("Error conectando con backend:", error);
       if (funcionError) funcionError(error);
     });
   }
