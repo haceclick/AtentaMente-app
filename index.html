@@ -728,40 +728,30 @@
         window.addEventListener('message', messageHandler);
         form.submit();
     } else {
-        // PETICIÓN LIGERA: USAMOS JSONP (EVITA TODOS LOS ERRORES DE CORS Y CABECERAS SEC-FETCH)
-        const callbackName = 'jsonp_callback_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-        
+        // PETICIÓN LIGERA: USAMOS GET (EVITA EL ERROR 404 DE CORS EN REDIRECCIONES AL 100%)
         const urlParams = new URLSearchParams({
             accion: accion,
-            parametros: JSON.stringify(parametros),
-            callback: callbackName
+            parametros: JSON.stringify(parametros)
         });
         const url = GOOGLE_SCRIPT_URL + '?' + urlParams.toString();
         
-        const script = document.createElement('script');
-        
-        window[callbackName] = function(data) {
-            delete window[callbackName];
-            if (script.parentNode) script.parentNode.removeChild(script);
-            
+        fetch(url, { method: 'GET', credentials: 'omit' })
+        .then(response => {
+            if (!response.ok) throw new Error(`Error en servidor (${response.status}): Intente recargar la página.`);
+            return response.json();
+        })
+        .then(data => {
             if (data.estado === 'exito') {
                 if (funcionExito) funcionExito(data.respuesta);
             } else {
                 if (funcionError) funcionError(data.mensaje);
                 else console.error("Error devuelto por Apps Script:", data.mensaje);
             }
-        };
-
-        script.onerror = function() {
-            delete window[callbackName];
-            if (script.parentNode) script.parentNode.removeChild(script);
-            const err = new Error("Error en red al intentar conectar con el servidor.");
-            console.error('Error conectando con backend:', err);
-            if (funcionError) funcionError(err);
-        };
-
-        script.src = url;
-        document.body.appendChild(script);
+        })
+        .catch(error => {
+            console.error('Error conectando con backend:', error);
+            if (funcionError) funcionError(error);
+        });
     }
   }
 
