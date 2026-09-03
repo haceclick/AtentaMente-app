@@ -668,65 +668,91 @@
         return;
     }
 
-    // Usamos el hack del iframe oculto y postMessage para evitar el 404 de CORS de Google Apps Script
-    const payload = JSON.stringify({
-        accion: accion,
-        parametros: parametros,
-        usePostMessage: true
-    });
+    // LISTA DE ACCIONES PESADAS (Subida de PDFs, HTMLs largos)
+    const ACCIONES_PESADAS = ['guardarHCPdf', 'guardarDocumentoClinico', 'subirInformePropio', 'uploadFileToDrive', 'guardarTemplate'];
 
-    const iframeName = 'gas_iframe_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-    
-    const iframe = document.createElement('iframe');
-    iframe.name = iframeName;
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
+    if (ACCIONES_PESADAS.includes(accion)) {
+        // Usamos el hack del iframe oculto para peticiones POST masivas (evita el límite de tamaño de la URL)
+        const payload = JSON.stringify({
+            accion: accion,
+            parametros: parametros,
+            usePostMessage: true
+        });
 
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = GOOGLE_SCRIPT_URL;
-    form.target = iframeName;
-    form.style.display = 'none';
-
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'payload';
-    input.value = payload;
-    form.appendChild(input);
-
-    document.body.appendChild(form);
-
-    const messageHandler = function(event) {
-        // Ignoramos mensajes que no sean del iframe que acabamos de crear
-        // Google envía todo como string JSON o un objeto
-        if (!event.data) return;
+        const iframeName = 'gas_iframe_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
         
-        let response;
-        try {
-            response = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        } catch (e) {
-            return; // No es nuestro mensaje
-        }
+        const iframe = document.createElement('iframe');
+        iframe.name = iframeName;
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
 
-        // Verificamos que sea nuestra respuesta
-        if (response && (response.estado === 'exito' || response.estado === 'error')) {
-            window.removeEventListener('message', messageHandler);
-            setTimeout(() => {
-                if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-                if (form.parentNode) form.parentNode.removeChild(form);
-            }, 1000);
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = GOOGLE_SCRIPT_URL;
+        form.target = iframeName;
+        form.style.display = 'none';
 
-            if (response.estado === 'exito') {
-                if (funcionExito) funcionExito(response.respuesta);
-            } else {
-                if (funcionError) funcionError(response.mensaje);
-                else console.error("Error del backend:", response.mensaje);
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'payload';
+        // Reemplazamos tags de cierre de script por si el HTML los tiene, para evitar que rompan el JS del backend
+        input.value = payload.replace(/<\/script>/g, '<\\/script>');
+        form.appendChild(input);
+
+        document.body.appendChild(form);
+
+        const messageHandler = function(event) {
+            if (!event.data) return;
+            let response;
+            try {
+                response = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+            } catch (e) {
+                return;
             }
-        }
-    };
+            if (response && (response.estado === 'exito' || response.estado === 'error')) {
+                window.removeEventListener('message', messageHandler);
+                setTimeout(() => {
+                    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+                    if (form.parentNode) form.parentNode.removeChild(form);
+                }, 1000);
 
-    window.addEventListener('message', messageHandler);
-    form.submit();
+                if (response.estado === 'exito') {
+                    if (funcionExito) funcionExito(response.respuesta);
+                } else {
+                    if (funcionError) funcionError(response.mensaje);
+                    else console.error("Error del backend:", response.mensaje);
+                }
+            }
+        };
+
+        window.addEventListener('message', messageHandler);
+        form.submit();
+    } else {
+        // PETICIÓN LIGERA: USAMOS GET (EVITA EL ERROR 404 DE CORS EN REDIRECCIONES AL 100%)
+        const urlParams = new URLSearchParams({
+            accion: accion,
+            parametros: JSON.stringify(parametros)
+        });
+        const url = GOOGLE_SCRIPT_URL + '?' + urlParams.toString();
+        
+        fetch(url, { method: 'GET', credentials: 'omit' })
+        .then(response => {
+            if (!response.ok) throw new Error(`Error en servidor (${response.status}): Intente recargar la página.`);
+            return response.json();
+        })
+        .then(data => {
+            if (data.estado === 'exito') {
+                if (funcionExito) funcionExito(data.respuesta);
+            } else {
+                if (funcionError) funcionError(data.mensaje);
+                else console.error("Error devuelto por Apps Script:", data.mensaje);
+            }
+        })
+        .catch(error => {
+            console.error('Error conectando con backend:', error);
+            if (funcionError) funcionError(error);
+        });
+    }
   }
 
   // 3. EL NUEVO ARRANQUE DE LA APP
