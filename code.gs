@@ -680,10 +680,20 @@ function obtenerEmailPorToken(token) {
 
 function doPost(e) {
   try {
-    var peticion = JSON.parse(e.postData.contents); var accion = peticion.accion; var parametros = peticion.parametros || []; var resultado;
-    if (typeof this[accion] === 'function') { resultado = this[accion].apply(this, parametros); } else { throw new Error("Función no existe."); }
+    var raw = (e && e.postData && e.postData.contents) ? e.postData.contents : ((e && e.parameter && e.parameter.payload) ? e.parameter.payload : "{}");
+    var peticion = JSON.parse(raw);
+    var accion = peticion.accion;
+    var parametros = peticion.parametros || [];
+    var resultado;
+    if (typeof this[accion] === 'function') {
+      resultado = this[accion].apply(this, parametros);
+    } else {
+      throw new Error("Función no existe: " + accion);
+    }
     return ContentService.createTextOutput(JSON.stringify({ estado: 'exito', respuesta: resultado })).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) { return ContentService.createTextOutput(JSON.stringify({ estado: 'error', mensaje: error.message })).setMimeType(ContentService.MimeType.JSON); }
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ estado: 'error', mensaje: error.message })).setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function guardarHCPdf(pacienteNombre, idDrivePaciente, htmlContent) {
