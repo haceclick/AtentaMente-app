@@ -27,10 +27,46 @@ const SECRETARIA_EMAILS = [
 ]; 
 
 function doGet(e) {
+  // 1. Si es una petición a la API (fetch GET o JSONP)
+  if (e && e.parameter && e.parameter.accion) {
+    try {
+      var accion = e.parameter.accion;
+      var parametrosStr = e.parameter.parametros || "[]";
+      var parametros = JSON.parse(parametrosStr);
+      var resultado;
+      
+      if (typeof this[accion] === 'function') {
+        resultado = this[accion].apply(this, parametros);
+      } else {
+        throw new Error("Función no existe.");
+      }
+      
+      var jsonRespuesta = JSON.stringify({ estado: 'exito', respuesta: resultado });
+      
+      // SOPORTE JSONP: Si mandamos callback, envolvemos en una función y retornamos Javascript
+      if (e.parameter.callback) {
+        return ContentService.createTextOutput(e.parameter.callback + '(' + jsonRespuesta + ');')
+            .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      
+      return ContentService.createTextOutput(jsonRespuesta).setMimeType(ContentService.MimeType.JSON);
+    } catch (error) {
+      var jsonError = JSON.stringify({ estado: 'error', mensaje: error.message });
+      if (e.parameter.callback) {
+        return ContentService.createTextOutput(e.parameter.callback + '(' + jsonError + ');')
+            .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(jsonError).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // 2. Si es una petición normal del navegador, devuelve la vista
   const emailIngreso = (e && e.parameter && e.parameter.uid) ? e.parameter.uid : '';
   const template = HtmlService.createTemplateFromFile('index');
   template.emailInyectado = emailIngreso || ""; 
-  return template.evaluate().setTitle('Atentamente').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL).addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);  
+  return template.evaluate().setTitle('Atentamente')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');  
 }
 
 function getColIndex(headers, possibleNames) {
@@ -693,6 +729,30 @@ function deleteFileFromDrive(fileId) {
     const file = DriveApp.getFileById(fileId); file.setTrashed(true); 
     return { success: true };
   } catch (e) { return { error: e.message }; }
+}
+
+function obtenerArchivoDrive(fileId) {
+  try {
+    if (!fileId) throw new Error("ID de archivo no proporcionado.");
+    let cleanId = String(fileId).trim();
+    if (cleanId.includes('drive.google.com')) {
+      const match = cleanId.match(/[-\w]{25,}/);
+      if (match) cleanId = match[0];
+    }
+    const file = DriveApp.getFileById(cleanId);
+    if (file.getSize() > 25 * 1024 * 1024) {
+      return { error: "El archivo supera los 25 MB y no puede previsualizarse en línea." };
+    }
+    const blob = file.getBlob();
+    return {
+      success: true,
+      name: file.getName(),
+      mimeType: blob.getContentType() || file.getMimeType(),
+      base64: Utilities.base64Encode(blob.getBytes())
+    };
+  } catch (e) {
+    return { error: e.message };
+  }
 }
 
 // =========================================================
