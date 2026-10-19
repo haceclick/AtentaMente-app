@@ -480,6 +480,44 @@
                                   <option value="" disabled selected>Seleccione paciente...</option>
                               </select>
                           </div>
+                          <div id="div-meses-informe" class="col-span-2 hidden grid grid-cols-2 gap-3 p-2.5 bg-teal-50/70 border border-teal-200 rounded-lg">
+                              <div>
+                                  <label class="block text-[10px] font-bold text-[#008395] uppercase mb-1">Mes de Inicio <span class="text-red-500">*</span></label>
+                                  <select id="doc-mes-inicio" class="w-full p-2 border border-slate-200 bg-white rounded text-xs focus:border-[#008395] outline-none">
+                                      <option value="" disabled selected>Mes inicio...</option>
+                                      <option value="Enero">Enero</option>
+                                      <option value="Febrero">Febrero</option>
+                                      <option value="Marzo">Marzo</option>
+                                      <option value="Abril">Abril</option>
+                                      <option value="Mayo">Mayo</option>
+                                      <option value="Junio">Junio</option>
+                                      <option value="Julio">Julio</option>
+                                      <option value="Agosto">Agosto</option>
+                                      <option value="Septiembre">Septiembre</option>
+                                      <option value="Octubre">Octubre</option>
+                                      <option value="Noviembre">Noviembre</option>
+                                      <option value="Diciembre">Diciembre</option>
+                                  </select>
+                              </div>
+                              <div>
+                                  <label class="block text-[10px] font-bold text-[#008395] uppercase mb-1">Mes de Fin <span class="text-red-500">*</span></label>
+                                  <select id="doc-mes-fin" class="w-full p-2 border border-slate-200 bg-white rounded text-xs focus:border-[#008395] outline-none">
+                                      <option value="" disabled selected>Mes fin...</option>
+                                      <option value="Enero">Enero</option>
+                                      <option value="Febrero">Febrero</option>
+                                      <option value="Marzo">Marzo</option>
+                                      <option value="Abril">Abril</option>
+                                      <option value="Mayo">Mayo</option>
+                                      <option value="Junio">Junio</option>
+                                      <option value="Julio">Julio</option>
+                                      <option value="Agosto">Agosto</option>
+                                      <option value="Septiembre">Septiembre</option>
+                                      <option value="Octubre">Octubre</option>
+                                      <option value="Noviembre">Noviembre</option>
+                                      <option value="Diciembre">Diciembre</option>
+                                  </select>
+                              </div>
+                          </div>
                           <div class="col-span-2">
                               <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fecha del Informe</label>
                               <input type="date" id="doc-fecha" class="w-full p-2 border border-slate-200 rounded text-xs focus:border-[#008395] outline-none">
@@ -514,7 +552,7 @@
                           <button onclick="insertarEnEditor('<b>', '</b>')" class="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold">B</button>
                           <button onclick="insertarEnEditor('<i>', '</i>')" class="px-2 py-1 bg-white border border-slate-200 rounded text-xs italic">I</button>
                           <button onclick="insertarEnEditor('<br>• ', '')" class="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] uppercase">Viñeta</button>
-                          <span class="text-[9px] text-slate-400 mt-1 ml-auto" id="doc-editor-hint">Variables: [PACIENTE] [DNI] [ESPECIALIDAD]</span>
+                          <span class="text-[9px] text-slate-400 mt-1 ml-auto" id="doc-editor-hint">Variables: [PACIENTE] [DNI] [ESPECIALIDAD] [PERIODO]</span>
                       </div>
                       
                       <textarea id="doc-editor-area" class="flex-1 w-full p-5 outline-none font-mono text-[12px] leading-relaxed resize-none text-slate-700 bg-white" placeholder="El contenido se generará aquí..."></textarea>
@@ -2336,14 +2374,30 @@
       const selectTipo = document.getElementById('doc-tipo');
       const docFecha = document.getElementById('doc-fecha');
       const filterTipo = document.getElementById('filter-control-tipo');
+      const divMeses = document.getElementById('div-meses-informe');
       if (!selectTipo) return;
       const today = new Date();
       const anio = today.getFullYear();
+      
+      const esInformeGeneral = (selectTipo.value === "Informe");
+      if (divMeses) {
+          if (esInformeGeneral) {
+              divMeses.classList.remove('hidden');
+          } else {
+              divMeses.classList.add('hidden');
+          }
+      }
+
       if (docFecha) {
           if (selectTipo.value === "Informe Junio") {
               docFecha.value = `${anio}-06-30`;
           } else if (selectTipo.value === "Informe Diciembre") {
               docFecha.value = `${anio}-12-31`;
+          } else if (esInformeGeneral) {
+              const yyyy = today.getFullYear();
+              const mm = String(today.getMonth() + 1).padStart(2, '0');
+              const dd = String(today.getDate()).padStart(2, '0');
+              docFecha.value = `${yyyy}-${mm}-${dd}`;
           }
       }
       if (filterTipo && (selectTipo.value === "Informe Junio" || selectTipo.value === "Informe Diciembre")) {
@@ -2360,7 +2414,58 @@
       alCambiarTipoDoc();
   }
 
+  function validarCamposInforme(tipo) {
+      if (tipo === "Informe") {
+          const mesInicio = document.getElementById('doc-mes-inicio') ? document.getElementById('doc-mes-inicio').value : '';
+          const mesFin = document.getElementById('doc-mes-fin') ? document.getElementById('doc-mes-fin').value : '';
+          const fecha = document.getElementById('doc-fecha') ? document.getElementById('doc-fecha').value : '';
+
+          if (!mesInicio) {
+              showToast("Debe completar el Mes de Inicio (campo excluyente)", "error");
+              const el = document.getElementById('doc-mes-inicio');
+              if (el) el.focus();
+              return false;
+          }
+          if (!mesFin) {
+              showToast("Debe completar el Mes de Fin (campo excluyente)", "error");
+              const el = document.getElementById('doc-mes-fin');
+              if (el) el.focus();
+              return false;
+          }
+          if (!fecha) {
+              showToast("Debe completar la Fecha del Informe (campo excluyente)", "error");
+              const el = document.getElementById('doc-fecha');
+              if (el) el.focus();
+              return false;
+          }
+      } else {
+          const fecha = document.getElementById('doc-fecha') ? document.getElementById('doc-fecha').value : '';
+          if (!fecha) {
+              showToast("Debe completar la Fecha del Documento", "error");
+              return false;
+          }
+      }
+      return true;
+  }
+
   function calcularPeriodoEvaluadoTexto(aprobadoVal, tipoDoc) {
+      if (tipoDoc === 'Informe') {
+          const mesInicioEl = document.getElementById('doc-mes-inicio');
+          const mesFinEl = document.getElementById('doc-mes-fin');
+          const docFechaEl = document.getElementById('doc-fecha');
+          const mesInicio = mesInicioEl ? mesInicioEl.value : '';
+          const mesFin = mesFinEl ? mesFinEl.value : '';
+          let anio = new Date().getFullYear();
+          if (docFechaEl && docFechaEl.value) {
+              const pDate = new Date(docFechaEl.value + 'T00:00:00');
+              if (!isNaN(pDate.getTime())) anio = pDate.getFullYear();
+          }
+          if (mesInicio && mesFin) {
+              if (mesInicio === mesFin) return `${mesInicio} ${anio}`;
+              return `${mesInicio} ${anio} a ${mesFin} ${anio}`;
+          }
+      }
+
       if (!aprobadoVal || aprobadoVal === '-' || String(aprobadoVal).trim() === '') {
           let today = new Date();
           let isPrimer = (tipoDoc === 'Informe Junio') || (tipoDoc === 'Informe' && (today.getMonth() + 1) <= 6);
@@ -2469,9 +2574,13 @@
       const pacienteIdx = document.getElementById('doc-paciente').value;
       if(!pacienteIdx) return showToast("Seleccione un paciente primero", "error");
       
+      const tipo = document.getElementById('doc-tipo').value;
+      if(!tipo) return showToast("Seleccione el tipo de documento", "error");
+
+      if (!validarCamposInforme(tipo)) return;
+
       docModoEdicion = 'documento';
       const p = CACHE_DATA.pacientes[pacienteIdx];
-      const tipo = document.getElementById('doc-tipo').value;
       
       let texto = obtenerTemplateBase(tipo);
 
@@ -2495,6 +2604,7 @@
       texto = texto.replace(/\[PACIENTE\]/g, p.paciente);
       texto = texto.replace(/\[DNI\]/g, p.dni || "S/D");
       texto = texto.replace(/\[ESPECIALIDAD\]/g, especialidadFinal);
+      texto = texto.replace(/\[PERIODO\]/g, periodoEvaluadoGlobal);
       
       document.getElementById('doc-panel-empty').classList.add('hidden');
       document.getElementById('doc-panel-editor').classList.remove('hidden');
@@ -2514,6 +2624,9 @@
       const btn = document.getElementById('btn-save-doc');
       if(!html.trim()) return showToast("El documento está vacío", "error");
       
+      const tipo = document.getElementById('doc-tipo').value;
+      if (docModoEdicion !== 'template' && !validarCamposInforme(tipo)) return;
+
       const pacienteIdx = document.getElementById('doc-paciente').value;
       const p = pacienteIdx ? CACHE_DATA.pacientes[pacienteIdx] : null;
       const infoRef = resolverInfoPrestador(p);
@@ -2529,6 +2642,10 @@
       if (rawDate) {
           const parts = rawDate.split('-');
           fechaDocFinal = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+
+      if (p) {
+          periodoEvaluadoGlobal = calcularPeriodoEvaluadoTexto(p.aprobado, tipo);
       }
 
       if(docModoEdicion === 'template') {
@@ -2642,8 +2759,10 @@
       const pacienteIdx = document.getElementById('doc-paciente').value;
       if(!pacienteIdx && docModoEdicion !== 'template') return showToast("Seleccione un paciente para generar la vista previa.", "error");
 
-      const p = pacienteIdx ? CACHE_DATA.pacientes[pacienteIdx] : { paciente: '[PACIENTE]', dni: '[DNI]', aprobado: '-' };
       const tipo = document.getElementById('doc-tipo').value;
+      if (docModoEdicion !== 'template' && !validarCamposInforme(tipo)) return;
+
+      const p = pacienteIdx ? CACHE_DATA.pacientes[pacienteIdx] : { paciente: '[PACIENTE]', dni: '[DNI]', aprobado: '-' };
 
       const infoRef = resolverInfoPrestador(p);
 
@@ -2662,6 +2781,7 @@
 
       const tipoSel = document.getElementById('doc-tipo') ? document.getElementById('doc-tipo').value : 'Informe';
       let periodoPrev = calcularPeriodoEvaluadoTexto(p.aprobado, tipoSel);
+      periodoEvaluadoGlobal = periodoPrev;
 
       let firmaHtml = '<br><span style="color:#999; font-size:10px;">[Sin firma cargada]</span><br>';
       let hasFirma = false;
@@ -2926,9 +3046,12 @@
       const pacienteIdx = document.getElementById('doc-paciente').value;
       if(!pacienteIdx) return showToast("Seleccione un paciente primero", "error");
 
-      const p = CACHE_DATA.pacientes[pacienteIdx];
       const tipo = document.getElementById('doc-tipo').value;
-      
+      if(!tipo) return showToast("Seleccione el tipo de documento", "error");
+
+      if (!validarCamposInforme(tipo)) return;
+
+      const p = CACHE_DATA.pacientes[pacienteIdx];
       const infoRef = resolverInfoPrestador(p);
       
       let finalPrestador = obtenerNombreRealPrestador(infoRef.nombre || CACHE_DATA.currentUserInfo.nombre);
