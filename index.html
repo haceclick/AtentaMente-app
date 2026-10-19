@@ -2234,20 +2234,41 @@
           const dFechaTime = dFechaParsed ? dFechaParsed.getTime() : 0;
           
           // Registro histórico del último informe
-          if (pacK && presK) {
-              const kPres = pacK + "_" + presK;
-              const prevParsed = (ultimosMapPres[kPres] && ultimosMapPres[kPres].fecha) ? parseDateStr(ultimosMapPres[kPres].fecha) : null;
-              const prevTime = prevParsed ? prevParsed.getTime() : 0;
-              if (!ultimosMapPres[kPres] || dFechaTime >= prevTime) {
-                  ultimosMapPres[kPres] = d;
+          const basePacK = pacK ? pacK.split('_')[0].trim() : "";
+          if (presK) {
+              if (pacK) {
+                  const kPres = pacK + "_" + presK;
+                  const prevParsed = (ultimosMapPres[kPres] && ultimosMapPres[kPres].fecha) ? parseDateStr(ultimosMapPres[kPres].fecha) : null;
+                  const prevTime = prevParsed ? prevParsed.getTime() : 0;
+                  if (!ultimosMapPres[kPres] || dFechaTime >= prevTime) {
+                      ultimosMapPres[kPres] = d;
+                  }
+              }
+              if (basePacK) {
+                  const kBasePres = basePacK + "_" + presK;
+                  const prevParsed = (ultimosMapPres[kBasePres] && ultimosMapPres[kBasePres].fecha) ? parseDateStr(ultimosMapPres[kBasePres].fecha) : null;
+                  const prevTime = prevParsed ? prevParsed.getTime() : 0;
+                  if (!ultimosMapPres[kBasePres] || dFechaTime >= prevTime) {
+                      ultimosMapPres[kBasePres] = d;
+                  }
               }
           }
-          if (pacK && espK) {
-              const kEsp = pacK + "_" + espK;
-              const prevParsed = (ultimosMapEsp[kEsp] && ultimosMapEsp[kEsp].fecha) ? parseDateStr(ultimosMapEsp[kEsp].fecha) : null;
-              const prevTime = prevParsed ? prevParsed.getTime() : 0;
-              if (!ultimosMapEsp[kEsp] || dFechaTime >= prevTime) {
-                  ultimosMapEsp[kEsp] = d;
+          if (espK) {
+              if (pacK) {
+                  const kEsp = pacK + "_" + espK;
+                  const prevParsed = (ultimosMapEsp[kEsp] && ultimosMapEsp[kEsp].fecha) ? parseDateStr(ultimosMapEsp[kEsp].fecha) : null;
+                  const prevTime = prevParsed ? prevParsed.getTime() : 0;
+                  if (!ultimosMapEsp[kEsp] || dFechaTime >= prevTime) {
+                      ultimosMapEsp[kEsp] = d;
+                  }
+              }
+              if (basePacK) {
+                  const kBaseEsp = basePacK + "_" + espK;
+                  const prevParsed = (ultimosMapEsp[kBaseEsp] && ultimosMapEsp[kBaseEsp].fecha) ? parseDateStr(ultimosMapEsp[kBaseEsp].fecha) : null;
+                  const prevTime = prevParsed ? prevParsed.getTime() : 0;
+                  if (!ultimosMapEsp[kBaseEsp] || dFechaTime >= prevTime) {
+                      ultimosMapEsp[kBaseEsp] = d;
+                  }
               }
           }
 
@@ -2268,20 +2289,40 @@
           }
 
           if (matchTipoControl) {
-              if (pacK && presK) {
-                  const kPres = pacK + "_" + presK;
-                  const prevParsed = (tipoMapPres[kPres] && tipoMapPres[kPres].fecha) ? parseDateStr(tipoMapPres[kPres].fecha) : null;
-                  const prevTime = prevParsed ? prevParsed.getTime() : 0;
-                  if (!tipoMapPres[kPres] || dFechaTime >= prevTime) {
-                      tipoMapPres[kPres] = d;
+              if (presK) {
+                  if (pacK) {
+                      const kPres = pacK + "_" + presK;
+                      const prevParsed = (tipoMapPres[kPres] && tipoMapPres[kPres].fecha) ? parseDateStr(tipoMapPres[kPres].fecha) : null;
+                      const prevTime = prevParsed ? prevParsed.getTime() : 0;
+                      if (!tipoMapPres[kPres] || dFechaTime >= prevTime) {
+                          tipoMapPres[kPres] = d;
+                      }
+                  }
+                  if (basePacK) {
+                      const kBasePres = basePacK + "_" + presK;
+                      const prevParsed = (tipoMapPres[kBasePres] && tipoMapPres[kBasePres].fecha) ? parseDateStr(tipoMapPres[kBasePres].fecha) : null;
+                      const prevTime = prevParsed ? prevParsed.getTime() : 0;
+                      if (!tipoMapPres[kBasePres] || dFechaTime >= prevTime) {
+                          tipoMapPres[kBasePres] = d;
+                      }
                   }
               }
-              if (pacK && espK) {
-                  const kEsp = pacK + "_" + espK;
-                  const prevParsed = (tipoMapEsp[kEsp] && tipoMapEsp[kEsp].fecha) ? parseDateStr(tipoMapEsp[kEsp].fecha) : null;
-                  const prevTime = prevParsed ? prevParsed.getTime() : 0;
-                  if (!tipoMapEsp[kEsp] || dFechaTime >= prevTime) {
-                      tipoMapEsp[kEsp] = d;
+              if (espK) {
+                  if (pacK) {
+                      const kEsp = pacK + "_" + espK;
+                      const prevParsed = (tipoMapEsp[kEsp] && tipoMapEsp[kEsp].fecha) ? parseDateStr(tipoMapEsp[kEsp].fecha) : null;
+                      const prevTime = prevParsed ? prevParsed.getTime() : 0;
+                      if (!tipoMapEsp[kEsp] || dFechaTime >= prevTime) {
+                          tipoMapEsp[kEsp] = d;
+                      }
+                  }
+                  if (basePacK) {
+                      const kBaseEsp = basePacK + "_" + espK;
+                      const prevParsed = (tipoMapEsp[kBaseEsp] && tipoMapEsp[kBaseEsp].fecha) ? parseDateStr(tipoMapEsp[kBaseEsp].fecha) : null;
+                      const prevTime = prevParsed ? prevParsed.getTime() : 0;
+                      if (!tipoMapEsp[kBaseEsp] || dFechaTime >= prevTime) {
+                          tipoMapEsp[kBaseEsp] = d;
+                      }
                   }
               }
           }
@@ -2313,12 +2354,13 @@
 
           const especialidadRenglon = normalizarEspecialidad({ titulo: p.prestadorTitulo || p.titulo });
           const pacK = normK(p.paciente);
+          const basePacK = pacK ? pacK.split('_')[0].trim() : "";
           const presK = normK(p.prestador);
           const espK = normK(especialidadRenglon);
           
-          const infTipo = tipoMapPres[pacK + "_" + presK] || tipoMapEsp[pacK + "_" + espK];
+          const infTipo = tipoMapPres[pacK + "_" + presK] || (basePacK ? tipoMapPres[basePacK + "_" + presK] : null) || tipoMapEsp[pacK + "_" + espK] || (basePacK ? tipoMapEsp[basePacK + "_" + espK] : null);
           const tieneInforme = !!infTipo;
-          const infUltimo = ultimosMapPres[pacK + "_" + presK] || ultimosMapEsp[pacK + "_" + espK];
+          const infUltimo = ultimosMapPres[pacK + "_" + presK] || (basePacK ? ultimosMapPres[basePacK + "_" + presK] : null) || ultimosMapEsp[pacK + "_" + espK] || (basePacK ? ultimosMapEsp[basePacK + "_" + espK] : null);
 
           totalInformesCount++;
           if (!tieneInforme) {
@@ -3185,49 +3227,59 @@
       const espNorm = normK(finalEspecialidad);
       const presNorm = normK(finalPrestador);
 
+      function matchPaciente(pacA, pacB) {
+          const a = normK(pacA);
+          const b = normK(pacB);
+          if (!a || !b) return false;
+          if (a === b) return true;
+          const baseA = a.split('_')[0].trim();
+          const baseB = b.split('_')[0].trim();
+          return (baseA && baseB && baseA === baseB && baseA.length >= 3);
+      }
+
       const isInforme = String(tipo).startsWith("Informe");
       const docsHistoricos = (CACHE_DATA.documentosClinicos || []).slice().reverse();
 
       // Buscamos informes que coincidan con el paciente y el tipo
       const docsPaciente = docsHistoricos.filter(d => {
-          const matchPac = normK(d.paciente) === pacNorm;
+          const matchPac = matchPaciente(d.paciente, p.paciente);
           const matchTipo = isInforme ? normK(d.tipo).startsWith("INFORME") : (normK(d.tipo) === normK(tipo));
           return matchPac && matchTipo;
       });
 
-      // 1. Buscamos primero coincidencia con especialidad o prestador que tenga HTML editable
+      // 1. Buscamos primero coincidencia con el mismo prestador que tenga HTML editable
       let docCandidato = docsPaciente.find(d => {
-          const dEsp = normK(d.especialidad);
           const dPres = normK(d.prestador);
-          const espCoincide = (!espNorm || espNorm === "GENERAL" || dEsp === "GENERAL" || dEsp === espNorm);
-          const presCoincide = (!presNorm || dPres === presNorm);
-          return (espCoincide || presCoincide) && d.html && String(d.html).trim() !== "";
+          return (presNorm && dPres === presNorm) && d.html && String(d.html).trim() !== "";
       });
 
-      // 2. Si no encontró por especialidad estricta, pero hay otro informe con HTML de este paciente
-      if (!docCandidato && docsPaciente.length > 0) {
-          docCandidato = docsPaciente.find(d => d.html && String(d.html).trim() !== "");
+      // 2. Si no encontró por prestador, buscamos por misma especialidad que tenga HTML editable
+      if (!docCandidato && espNorm && espNorm !== "GENERAL") {
+          docCandidato = docsPaciente.find(d => {
+              const dEsp = normK(d.especialidad);
+              return (dEsp === espNorm) && d.html && String(d.html).trim() !== "";
+          });
       }
 
       if (docCandidato && docCandidato.html) {
           docModoEdicion = 'documento';
           document.getElementById('doc-panel-empty').classList.add('hidden');
           document.getElementById('doc-panel-editor').classList.remove('hidden');
-          document.getElementById('doc-editor-title').innerHTML = `<i data-lucide="history" class="w-4 h-4"></i> Editando Anterior (${docCandidato.tipo || 'Informe'}): ${p.paciente}`;
+          document.getElementById('doc-editor-title').innerHTML = `<i data-lucide="history" class="w-4 h-4"></i> Editando Anterior (${docCandidato.tipo || 'Informe'}${docCandidato.especialidad ? ' - ' + docCandidato.especialidad : ''}): ${p.paciente}`;
           document.getElementById('doc-editor-area').value = docCandidato.html;
           lucide.createIcons();
-          showToast(`Texto anterior (${docCandidato.tipo || 'Informe'} - ${docCandidato.fecha || ''}) cargado con éxito.`, "success");
+          showToast(`Texto anterior (${docCandidato.tipo || 'Informe'}${docCandidato.especialidad ? ' - ' + docCandidato.especialidad : ''} - ${docCandidato.fecha || ''}) cargado con éxito.`, "success");
           return;
       }
 
-      // Si hay documentos registrados para este paciente pero no tienen HTML editable (fueron subidos en PDF)
+      // Si hay documentos registrados para este paciente y especialidad/prestador pero no tienen HTML editable (fueron subidos en PDF)
       const docSinHtml = docsPaciente.find(d => {
           const dEsp = normK(d.especialidad);
           const dPres = normK(d.prestador);
-          const espCoincide = (!espNorm || espNorm === "GENERAL" || dEsp === "GENERAL" || dEsp === espNorm);
-          const presCoincide = (!presNorm || dPres === presNorm);
-          return (espCoincide || presCoincide);
-      }) || (docsPaciente.length > 0 ? docsPaciente[0] : null);
+          const presCoincide = (presNorm && dPres === presNorm);
+          const espCoincide = (espNorm && espNorm !== "GENERAL" && dEsp === espNorm);
+          return (presCoincide || espCoincide);
+      });
 
       const oldHtml = btn ? btn.innerHTML : null;
       if (btn) {
@@ -3256,7 +3308,7 @@
               const infFecha = (docSinHtml && docSinHtml.fecha) ? ` (${docSinHtml.fecha})` : '';
               showToast(`El informe anterior${infFecha} está registrado en Drive en PDF, pero fue subido directamente sin borrador de texto editable en la planilla.`, "warning", 6000);
           } else {
-              showToast(res.message || "No se encontró ningún informe anterior registrado para este paciente y especialidad.", "warning");
+              showToast(res.message || `No se encontró ningún informe anterior de ${finalEspecialidad || 'su especialidad'} registrado para este paciente.`, "warning");
           }
       }, function(err) {
           if (btn) {

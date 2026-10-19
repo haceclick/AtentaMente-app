@@ -1072,22 +1072,29 @@ function getUltimoInforme(paciente, prestador, especialidad, tipo) {
 
     const isInforme = String(tipo).startsWith("Informe");
     const pacTarget = normStr(paciente);
+    const basePacTarget = pacTarget ? pacTarget.split('_')[0].trim() : "";
     const presTarget = normStr(prestador);
     const espTarget = normStr(especialidad);
 
+    function matchPac(p1) {
+      if (!p1 || !pacTarget) return false;
+      if (p1 === pacTarget) return true;
+      const b1 = p1.split('_')[0].trim();
+      return (b1 && basePacTarget && b1 === basePacTarget && b1.length >= 3);
+    }
+
     let docEncontradoSinTexto = false;
+    // 1. Prioridad: mismo prestador con HTML
     for (let i = dataDocs.length - 1; i >= 1; i--) {
         const rowTipo = String(dataDocs[i][2] || "").trim();
-        const rowEsp = normStr(dataDocs[i][3]);
         const rowPac = normStr(dataDocs[i][4]);
         const rowPres = normStr(dataDocs[i][5]);
         const htmlGuardado = dataDocs[i][7];
 
         const tipoCoincide = isInforme ? rowTipo.startsWith("Informe") : (rowTipo === tipo);
         const matchPres = presTarget ? (rowPres === presTarget) : false;
-        const matchEsp = (rowEsp === espTarget || !espTarget || espTarget === "GENERAL" || rowEsp === "GENERAL");
         
-        if (rowPac === pacTarget && tipoCoincide && (matchPres || matchEsp)) {
+        if (matchPac(rowPac) && tipoCoincide && matchPres) {
             if (htmlGuardado && String(htmlGuardado).trim() !== "") {
                 return { success: true, html: htmlGuardado };
             } else {
@@ -1095,6 +1102,28 @@ function getUltimoInforme(paciente, prestador, especialidad, tipo) {
             }
         }
     }
+
+    // 2. Si no encontró por prestador exacto, buscar por misma especialidad
+    if (espTarget && espTarget !== "GENERAL") {
+        for (let i = dataDocs.length - 1; i >= 1; i--) {
+            const rowTipo = String(dataDocs[i][2] || "").trim();
+            const rowEsp = normStr(dataDocs[i][3]);
+            const rowPac = normStr(dataDocs[i][4]);
+            const htmlGuardado = dataDocs[i][7];
+
+            const tipoCoincide = isInforme ? rowTipo.startsWith("Informe") : (rowTipo === tipo);
+            const matchEsp = (rowEsp === espTarget);
+            
+            if (matchPac(rowPac) && tipoCoincide && matchEsp) {
+                if (htmlGuardado && String(htmlGuardado).trim() !== "") {
+                    return { success: true, html: htmlGuardado };
+                } else {
+                    docEncontradoSinTexto = true;
+                }
+            }
+        }
+    }
+
     if (docEncontradoSinTexto) {
         return { success: false, sinTexto: true, message: "El informe anterior está registrado en Drive, pero fue subido directamente en formato PDF sin borrador de texto editable en la planilla." };
     }
