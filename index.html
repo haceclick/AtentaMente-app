@@ -2813,7 +2813,7 @@
 
           if (CACHE_DATA.documentosClinicos) {
               documentExists = CACHE_DATA.documentosClinicos.some(d => {
-                  const matchTipo = esTipoInforme ? String(d.tipo).startsWith("Informe") : (d.tipo === payload.tipo);
+                  const matchTipo = (normK(d.tipo) === normK(payload.tipo));
                   const matchPac = normK(d.paciente) === pacK;
                   const matchPres = presK ? (normK(d.prestador) === presK) : false;
                   const matchEsp = normK(d.especialidad) === espK;
@@ -2834,7 +2834,7 @@
                       showToast("PDF guardado en la carpeta del paciente", "success"); 
                       if (!CACHE_DATA.documentosClinicos) CACHE_DATA.documentosClinicos = [];
                       CACHE_DATA.documentosClinicos = CACHE_DATA.documentosClinicos.filter(d => {
-                          const matchTipo = esTipoInforme ? String(d.tipo).startsWith("Informe") : (d.tipo === payload.tipo);
+                          const matchTipo = (normK(d.tipo) === normK(payload.tipo));
                           const matchPac = normK(d.paciente) === pacK;
                           const matchPres = presK ? (normK(d.prestador) === presK) : false;
                           const matchEsp = normK(d.especialidad) === espK;
