@@ -1084,17 +1084,19 @@ function getUltimoInforme(paciente, prestador, especialidad, tipo) {
     }
 
     let docEncontradoSinTexto = false;
-    // 1. Prioridad: mismo prestador con HTML
+    // 1. Prioridad: mismo prestador Y misma prestación (especialidad) con HTML
     for (let i = dataDocs.length - 1; i >= 1; i--) {
         const rowTipo = String(dataDocs[i][2] || "").trim();
+        const rowEsp = normStr(dataDocs[i][3]);
         const rowPac = normStr(dataDocs[i][4]);
         const rowPres = normStr(dataDocs[i][5]);
         const htmlGuardado = dataDocs[i][7];
 
         const tipoCoincide = isInforme ? rowTipo.startsWith("Informe") : (rowTipo === tipo);
         const matchPres = presTarget ? (rowPres === presTarget) : false;
+        const matchEsp = (espTarget && espTarget !== "GENERAL") ? (rowEsp === espTarget) : true;
         
-        if (matchPac(rowPac) && tipoCoincide && matchPres) {
+        if (matchPac(rowPac) && tipoCoincide && matchPres && matchEsp) {
             if (htmlGuardado && String(htmlGuardado).trim() !== "") {
                 return { success: true, html: htmlGuardado };
             } else {
