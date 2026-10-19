@@ -713,9 +713,63 @@
         return;
     }
 
+    const parametrosStr = JSON.stringify(parametros || []);
+
+    // Para peticiones ligeras (como getAppData, getTemplates, notificaciones, etc.):
+    // Usamos JSONP mediante <script>. Es 100% inmune a bloqueos de CORS y redirecciones de Google.
+    if (parametrosStr.length < 2000) {
+        const callbackName = 'gas_jsonp_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+        const urlParams = new URLSearchParams({
+            accion: accion,
+            parametros: parametrosStr,
+            callback: callbackName
+        });
+        const url = GOOGLE_SCRIPT_URL + '?' + urlParams.toString();
+
+        const script = document.createElement('script');
+        let timer = null;
+
+        const limpiar = function() {
+            if (timer) clearTimeout(timer);
+            delete window[callbackName];
+            if (script && script.parentNode) script.parentNode.removeChild(script);
+        };
+
+        window[callbackName] = function(datos) {
+            limpiar();
+            if (datos && datos.estado === 'exito') {
+                if (funcionExito) funcionExito(datos.respuesta);
+            } else {
+                const msg = (datos && datos.mensaje) ? datos.mensaje : 'Error desconocido en el servidor';
+                if (funcionError) funcionError(new Error(msg));
+                else console.error("Error devuelto por Apps Script:", msg);
+            }
+        };
+
+        script.onerror = function() {
+            limpiar();
+            const err = new Error("Error de conexión con Google Apps Script (JSONP).");
+            console.error("Error conectando con backend:", err);
+            if (funcionError) funcionError(err);
+        };
+
+        // Timeout preventivo de 60 segundos
+        timer = setTimeout(function() {
+            limpiar();
+            const err = new Error("Tiempo de espera agotado al conectar con el servidor.");
+            console.error(err);
+            if (funcionError) funcionError(err);
+        }, 60000);
+
+        script.src = url;
+        document.body.appendChild(script);
+        return;
+    }
+
+    // Para peticiones pesadas (subida de PDFs, HTMLs largos): Usamos fetch POST
     fetch(GOOGLE_SCRIPT_URL, {
       method: 'POST',
-      credentials: 'omit',
+      redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ accion: accion, parametros: parametros })
     })
