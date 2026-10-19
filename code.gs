@@ -890,8 +890,10 @@ function guardarDocumentoClinico(payload) {
     const espTarget = normStr(payload.especialidad);
 
     for(let i = 1; i < dataDocs.length; i++) {
-        // Si el paciente ya tiene este mismo tipo de informe con este prestador o especialidad, actualizamos la fila
-        const matchTipo = esTipoInforme ? String(dataDocs[i][2]).startsWith("Informe") : (dataDocs[i][2] === payload.tipo);
+        // Coincidencia exacta del tipo de documento para mantener filas separadas por semestre/tipo
+        const rowTipo = normStr(dataDocs[i][2]);
+        const targetTipo = normStr(payload.tipo);
+        const matchTipo = (rowTipo === targetTipo);
         const matchPac = normStr(dataDocs[i][4]) === pacTarget;
         const matchPres = presTarget ? (normStr(dataDocs[i][5]) === presTarget) : false;
         const matchEsp = normStr(dataDocs[i][3]) === espTarget;
@@ -989,8 +991,10 @@ function subirInformePropio(payload) {
 
     let actualizado = false;
     for(let i = 1; i < dataDocs.length; i++) {
-        // Busca coincidencias de Paciente Y (Prestador O Especialidad)
-        const matchTipo = String(dataDocs[i][2]).startsWith('Informe');
+        // Busca coincidencias de Paciente Y (Prestador O Especialidad) con el tipo exacto
+        const rowTipo = normStr(dataDocs[i][2]);
+        const targetTipo = normStr(tipoInformeGuar);
+        const matchTipo = (rowTipo === targetTipo);
         const matchPac = normStr(dataDocs[i][4]) === pacTarget;
         const matchPres = presTarget ? (normStr(dataDocs[i][5]) === presTarget) : false;
         const matchEsp = normStr(dataDocs[i][3]) === espTarget;
@@ -1016,7 +1020,7 @@ function subirInformePropio(payload) {
   }
 }
 
-function eliminarInformeClinico(paciente, especialidad, prestador) {
+function eliminarInformeClinico(paciente, especialidad, prestador, tipo) {
   try {
     const ss = SpreadsheetApp.openById(ID_PLANILLA);
     const sheetDocs = ss.getSheetByName('Documentos_Clinicos');
@@ -1026,11 +1030,13 @@ function eliminarInformeClinico(paciente, especialidad, prestador) {
     const pacK = normStr(paciente);
     const presK = normStr(prestador);
     const espK = normStr(especialidad);
+    const tipoK = normStr(tipo || "");
     
     let eliminado = false;
     for (let i = dataDocs.length - 1; i >= 1; i--) {
-        const rowTipo = String(dataDocs[i][2] || "");
-        if (rowTipo.startsWith("Informe")) {
+        const rowTipo = normStr(dataDocs[i][2] || "");
+        const matchTipo = tipoK ? (rowTipo === tipoK) : rowTipo.startsWith("INFORME");
+        if (matchTipo) {
             const rowPac = normStr(dataDocs[i][4]);
             const rowPres = normStr(dataDocs[i][5]);
             const rowEsp = normStr(dataDocs[i][3]);
