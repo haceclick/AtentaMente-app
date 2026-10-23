@@ -708,14 +708,27 @@
   const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzZHY_DZH9fZRgV0ELZ_ZM7iM4W8OAOMUuJ4pffX9KTCsdgxgY8-WO_oepfJZXtuI7ARw/exec";
 
   // 2. NUESTRO PUENTE DE COMUNICACIÓN
+  // 2. NUESTRO PUENTE DE COMUNICACIÓN LIMPIO (Solo POST)
   function llamarBackend(accion, parametros, funcionExito, funcionError) {
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-        let runner = google.script.run;
-        if (funcionExito) runner = runner.withSuccessHandler(funcionExito);
-        if (funcionError) runner = runner.withFailureHandler(funcionError);
-        runner[accion].apply(runner, parametros);
-        return;
-    }
+    fetch(GOOGLE_SCRIPT_URL, {
+      redirect: "follow", 
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ accion: accion, parametros: parametros })
+    })
+    .then(respuesta => respuesta.json())
+    .then(datos => {
+      if (datos.estado === 'exito') {
+        if (funcionExito) funcionExito(datos.respuesta);
+      } else {
+        if (funcionError) funcionError(new Error(datos.mensaje));
+      }
+    })
+    .catch(error => {
+      console.error("Error en fetch POST:", error);
+      if (funcionError) funcionError(error);
+    });
+  }
 
     const parametrosStr = JSON.stringify(parametros || []);
 
