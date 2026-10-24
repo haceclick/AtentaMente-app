@@ -956,6 +956,9 @@
         var CURRENT_HC_HISTORIAL = [];
         var NAV_HISTORY = [];
         var EXIT_VIEW = 'dashboard';
+var IS_FINANZAS_LOADED = false;
+var IS_FINANZAS_LOADING = false;
+var TEMPLATES_LOADED = false;
         var CURRENT_FOLDER_ID = null;
         var SHOW_ONLY_PENDING = false;
         var IS_DOCUMENTACION_PERSONAL = false;
@@ -1196,12 +1199,17 @@
                 nav('docclinica');
             }
 
-            // --- SOLUCIÓN: DOBLE CARGA DE PLANTILLAS MEDIANTE PUENTE ---
-            llamarBackend('getTemplates', ["ADMIN"], function (masters) {
-                llamarBackend('getTemplates', [data.currentUserInfo.nombre], function (personales) {
-                    misTemplates = [...personales, ...masters];
-                });
-            });
+            // Carga en segundo plano de estadísticas y facturas (solo terapeutas, sin bloquear la UI)
+            if (!data.isAdmin && !data.isSecretaria) {
+                setTimeout(function () {
+                    cargarFacturasBackground();
+                }, 300);
+            }
+
+            // Carga diferida de plantillas (asíncrono en background)
+            setTimeout(function () {
+                asegurarTemplatesCargados();
+            }, 800);
 
             setInterval(function () {
                 if (!document.getElementById('view-dashboard').classList.contains('hidden')) {
@@ -1323,6 +1331,114 @@
             return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
         }
 
+
+        function renderDashboardFinanzas() {
+            if (typeof CACHE_DATA === "undefined" || !CACHE_DATA) return;
+
+            if (CACHE_DATA.isAdmin || CACHE_DATA.isSecretaria) {
+                setText("kpi-ingresos-est", "-");
+                const breakdownContainer = document.getElementById("breakdown-os");
+                if (breakdownContainer) breakdownContainer.innerHTML = '<div class="p-3 text-center text-gray-400 italic text-xs">Métricas personales deshabilitadas para Administrador</div>';
+                const chart = document.getElementById("chart-comparison");
+                if (chart) chart.innerHTML = '<div class="flex items-center justify-center w-full h-full text-xs text-gray-400 italic">Vista general administrativa</div>';
+                return;
+            }
+
+            if (!IS_FINANZAS_LOADED) {
+                const kpiEl = document.getElementById("kpi-ingresos-est");
+                if (kpiEl) kpiEl.innerHTML = '<span class="text-xs text-gray-400 font-normal">Calculando...</span>';
+                const breakdownContainer = document.getElementById("breakdown-os");
+                if (breakdownContainer) breakdownContainer.innerHTML = '<div class="p-3 text-center text-gray-400 italic text-xs">Calculando métricas en segundo plano...</div>';
+                const chart = document.getElementById("chart-comparison");
+                if (chart) chart.innerHTML = '<div class="flex items-center justify-center w-full h-full text-xs text-gray-400 italic">Calculando gráfico...</div>';
+                return;
+            }
+
+            const stats = CACHE_DATA.financialStats || { estimatedIncome: 0, monthlyBilling: [0, 0, 0], breakdown: {}, avgDelays: {} };
+            setText("kpi-ingresos-est", formatMoney(stats.estimatedIncome));
+            const breakdownContainer = document.getElementById("breakdown-os");
+            let breakdownHtml = "";
+            const sortedOS = Object.keys(stats.breakdown || {}).sort((a, b) => stats.breakdown[b] - stats.breakdown[a]);
+            if (sortedOS.length === 0) {
+                breakdownHtml = '<div class="p-3 text-center text-gray-400 italic text-xs">Sin ingresos estimados</div>';
+            } else {
+                sortedOS.forEach(function (os) {
+                    const delay = (stats.avgDelays && stats.avgDelays[os]) ? stats.avgDelays[os] + "d" : "-";
+                    breakdownHtml += '<div class="flex justify-between items-center px-5 py-2 hover:bg-gray-50">' +
+                        '<span class="font-medium text-gray-600 truncate mr-2 w-1/3">' + os + '</span>' +
+                        '<span class="text-xs text-gray-400 font-mono text-center w-1/4" title="Demora promedio">' + delay + '</span>' +
+                        '<span class="font-bold text-teal-600 text-right w-1/3">' + formatMoney(stats.breakdown[os]) + '</span>' +
+                        '</div>';
+                });
+            }
+            if (breakdownContainer) breakdownContainer.innerHTML = breakdownHtml;
+
+            const chart = document.getElementById("chart-comparison");
+            const monthlyBilling = stats.monthlyBilling || [0, 0, 0];
+            const maxVal = Math.max(...monthlyBilling, 1);
+            const labels = ["Actual", "Mes Ant.", "Hace 2 M"];
+            const colors = ["bg-[#008395]", "bg-[#2dd4bf]", "bg-[#99f6e4]"];
+            let chartHtml = "";
+            for (let i = 2; i >= 0; i--) {
+                const val = monthlyBilling[i];
+                const hPct = Math.max((val / maxVal) * 100, 10);
+                const color = colors[i];
+                chartHtml += '<div class="flex flex-col items-center flex-1 h-full justify-end group">' +
+                    '<div class="w-full max-w-[40px] rounded-t-md ' + color + ' bar-graph-col relative" style="height:' + hPct + '%">' +
+                    '<div class="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[9px] px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-mono">' + formatMoney(val) + '</div>' +
+                    '</div>' +
+                    '<span class="text-[9px] text-gray-400 mt-2 font-medium uppercase tracking-wider">' + labels[i] + '</span>' +
+                    '</div>';
+            }
+            if (chart) chart.innerHTML = chartHtml;
+        }
+
+        function cargarFacturasBackground(onSuccess) {
+            if (IS_FINANZAS_LOADED) {
+                if (onSuccess) onSuccess();
+                return;
+            }
+            if (CACHE_DATA && (CACHE_DATA.isAdmin || CACHE_DATA.isSecretaria)) {
+                IS_FINANZAS_LOADED = true;
+                if (onSuccess) onSuccess();
+                return;
+            }
+            if (IS_FINANZAS_LOADING) return;
+            IS_FINANZAS_LOADING = true;
+
+            llamarBackend("getFacturasData", [USER_EMAIL_GLOBAL], function (res) {
+                IS_FINANZAS_LOADING = false;
+                IS_FINANZAS_LOADED = true;
+                if (res) {
+                    CACHE_DATA.facturas = res.facturas || [];
+                    CACHE_DATA.financialStats = res.financialStats || { estimatedIncome: 0, monthlyBilling: [0, 0, 0], breakdown: {}, avgDelays: {} };
+                }
+                renderDashboardFinanzas();
+                renderFacturasTable();
+                if (onSuccess) onSuccess();
+            }, function (err) {
+                IS_FINANZAS_LOADING = false;
+                console.error("Error al cargar finanzas en segundo plano:", err);
+            });
+        }
+
+        function asegurarTemplatesCargados(callback) {
+            if (TEMPLATES_LOADED && misTemplates && misTemplates.length > 0) {
+                if (callback) callback();
+                return;
+            }
+            llamarBackend("getTemplates", ["ADMIN"], function (masters) {
+                const nombreUser = (CACHE_DATA && CACHE_DATA.currentUserInfo && CACHE_DATA.currentUserInfo.nombre) ? CACHE_DATA.currentUserInfo.nombre : "ADMIN";
+                llamarBackend("getTemplates", [nombreUser], function (personales) {
+                    misTemplates = [...(personales || []), ...(masters || [])];
+                    TEMPLATES_LOADED = true;
+                    if (callback) callback();
+                });
+            }, function (err) {
+                console.error("Error cargando templates diferidos:", err);
+            });
+        }
+
         function renderDashboard() {
             if (!CACHE_DATA) return;
 
@@ -1341,43 +1457,7 @@
             });
             setText('kpi-vencimientos', vtos.length);
 
-            const stats = CACHE_DATA.financialStats || { estimatedIncome: 0, monthlyBilling: [0, 0, 0], breakdown: {}, avgDelays: {} };
-            setText('kpi-ingresos-est', formatMoney(stats.estimatedIncome));
-            const breakdownContainer = document.getElementById('breakdown-os');
-            let breakdownHtml = '';
-            const sortedOS = Object.keys(stats.breakdown || {}).sort((a, b) => stats.breakdown[b] - stats.breakdown[a]);
-            if (sortedOS.length === 0) {
-                breakdownHtml = '<div class="p-3 text-center text-gray-400 italic">Sin ingresos estimados</div>';
-            } else {
-                sortedOS.forEach(function (os) {
-                    const delay = (stats.avgDelays && stats.avgDelays[os]) ? stats.avgDelays[os] + 'd' : '-';
-                    breakdownHtml += '<div class="flex justify-between items-center px-5 py-2 hover:bg-gray-50">' +
-                        '<span class="font-medium text-gray-600 truncate mr-2 w-1/3">' + os + '</span>' +
-                        '<span class="text-xs text-gray-400 font-mono text-center w-1/4" title="Demora promedio">' + delay + '</span>' +
-                        '<span class="font-bold text-teal-600 text-right w-1/3">' + formatMoney(stats.breakdown[os]) + '</span>' +
-                        '</div>';
-                });
-            }
-            breakdownContainer.innerHTML = breakdownHtml;
-
-            const chart = document.getElementById('chart-comparison');
-            const monthlyBilling = stats.monthlyBilling || [0, 0, 0];
-            const maxVal = Math.max(...monthlyBilling, 1);
-            const labels = ['Actual', 'Mes Ant.', 'Hace 2 M'];
-            const colors = ['bg-[#008395]', 'bg-[#2dd4bf]', 'bg-[#99f6e4]'];
-            let chartHtml = '';
-            for (let i = 2; i >= 0; i--) {
-                const val = monthlyBilling[i];
-                const hPct = Math.max((val / maxVal) * 100, 10);
-                const color = colors[i];
-                chartHtml += '<div class="flex flex-col items-center flex-1 h-full justify-end group">' +
-                    '<div class="w-full max-w-[40px] rounded-t-md ' + color + ' bar-graph-col relative" style="height:' + hPct + '%">' +
-                    '<div class="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[9px] px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-mono">' + formatMoney(val) + '</div>' +
-                    '</div>' +
-                    '<span class="text-[9px] text-gray-400 mt-2 font-medium uppercase tracking-wider">' + labels[i] + '</span>' +
-                    '</div>';
-            }
-            chart.innerHTML = chartHtml;
+            renderDashboardFinanzas();
 
             renderNotifications();
             if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -1577,6 +1657,20 @@
             const btn = document.getElementById('btn-' + view);
             if (btn) btn.classList.add('active');
             document.querySelectorAll('.view-div').forEach(function (v) { v.classList.add('hidden'); });
+            if (view === 'misfacturas') {
+                if (!IS_FINANZAS_LOADED) {
+                    const tbody = document.getElementById('table-facturas');
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-400 text-xs"><div class="loader mx-auto mb-2"></div>Cargando facturas...</td></tr>';
+                    cargarFacturasBackground(function () {
+                        renderFacturasTable();
+                    });
+                } else {
+                    renderFacturasTable();
+                }
+            }
+            if (view === 'docclinica') {
+                asegurarTemplatesCargados();
+            }
             if (view === 'pacientes' || view === 'dashboard' || view === 'misfacturas' || view === 'docclinica') {
                 document.getElementById('view-' + view).classList.remove('hidden');
             } else {
@@ -3191,7 +3285,13 @@
                         cerrarEditorDoc();
 
                         if (res.success) {
-                            showToast("PDF guardado en la carpeta del paciente", "success");
+                            if (res.idDriveActualizado) {
+                                const pacObj = CACHE_DATA.pacientes.find(p => normK(p.paciente) === pacK);
+                                if (pacObj) pacObj.idDrive = res.idDriveActualizado;
+                                showToast("PDF guardado (Se corrigió y vinculó la carpeta de Drive automáticamente)", "success", 5000);
+                            } else {
+                                showToast("PDF guardado en la carpeta del paciente", "success");
+                            }
                             if (!CACHE_DATA.documentosClinicos) CACHE_DATA.documentosClinicos = [];
                             CACHE_DATA.documentosClinicos = CACHE_DATA.documentosClinicos.filter(d => {
                                 const matchTipo = (normK(d.tipo) === normK(payload.tipo));
@@ -3442,7 +3542,13 @@
                 llamarBackend('subirInformePropio', [payload], function (res) {
                     document.getElementById('file-upload-propio').value = '';
                     if (res.success) {
-                        showToast("Informe Especial subido y guardado", "success");
+                        if (res.idDriveActualizado) {
+                            const pacObj = CACHE_DATA.pacientes.find(p => normK(p.paciente) === normK(UPLOAD_PROPIO_DATA.paciente));
+                            if (pacObj) pacObj.idDrive = res.idDriveActualizado;
+                            showToast("Informe Especial subido (Se corrigió y vinculó la carpeta en Drive automáticamente)", "success", 5000);
+                        } else {
+                            showToast("Informe Especial subido y guardado", "success");
+                        }
                         if (!CACHE_DATA.documentosClinicos) CACHE_DATA.documentosClinicos = [];
                         CACHE_DATA.documentosClinicos.push(res.doc);
                         renderControlInformes();

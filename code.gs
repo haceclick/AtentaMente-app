@@ -300,177 +300,9 @@ function getAppData(tokenDelFrontend) {
         }
     }
 
-    // --- 3. FACTURAS Y ESTADÍSTICAS ---
+    // --- 3. FACTURAS Y ESTADÍSTICAS (Cargadas bajo demanda para arranque ultra rápido) ---
     let facturasList = [];
     let financialStats = { estimatedIncome: 0, monthlyBilling: [0, 0, 0], breakdown: {}, avgDelays: {} };
-
-    const sheetFacturas = ss.getSheetByName(NOMBRE_HOJA_FACTURAS);
-    if (sheetFacturas) {
-      const lastRowF = sheetFacturas.getLastRow();
-      if (lastRowF > 1) {
-          const dataF = sheetFacturas.getRange(1, 1, lastRowF, sheetFacturas.getLastColumn()).getDisplayValues();
-          const hF = dataF[0];
-          const idxF_Email = getColIndex(hF, ['E-MAIL', 'EMAIL']);
-          const idxF_Terapeuta = getColIndex(hF, ['TERAPEUTA', 'PROFESIONAL', 'PRESTADOR']);
-          const idxF_Paciente = getColIndex(hF, ['PACIENTE']);
-          const idxF_OS = getColIndex(hF, ['RAZON SOCIAL', 'OBRA SOCIAL']);
-          const idxF_Mes = getColIndex(hF, ['MES']);
-          const idxF_Monto = getColIndex(hF, ['FACTURACION', 'IMPORTE']);
-          const idxF_Fecha = getColIndex(hF, ['FECHA DE FACTURA', 'FECHA FACTURA']);
-          const idxF_Num = getColIndex(hF, ['N° FACTURA', 'NUMERO', 'FACTURA']);
-          const idxF_Cobro = getColIndex(hF, ['FECHA DE COBRO', 'FECHA COBRO']);
-          const idxF_Estado = getColIndex(hF, ['APROBACIÓN', 'ESTADO']);
-
-          const now = new Date();
-          const currentMonth = now.getMonth();
-          const currentYear = now.getFullYear();
-          let allRelevantInvoices = [];
-          
-          for(let i=1; i<dataF.length; i++) {
-          const row = dataF[i];
-          if(row.join('').trim() === '') continue;
-
-          const rowTerapeuta = (idxF_Terapeuta > -1 && row[idxF_Terapeuta]) ? String(row[idxF_Terapeuta]).trim() : 'Sin Nombre';
-          const rowEmail = (idxF_Email > -1 && row[idxF_Email]) ? String(row[idxF_Email]).trim().toLowerCase() : '';
-          const myEmail = userEmail.toLowerCase();
-          const myName = String(currentUserInfo.nombre).trim().toLowerCase();
-
-          // Filtramos para las estadísticas: solo lo que coincida con el mail o nombre del usuario
-          const esPropio = (rowEmail === myEmail || rowTerapeuta.toLowerCase() === myName);
-          
-          if (!esPropio && (!isAdmin || rowEmail !== myEmail)) {
-              if (!isAdmin) continue; 
-          }
-
-              const fechaFacturaStr = (idxF_Fecha > -1) ? row[idxF_Fecha] : '';
-              const fechaCobroStr = (idxF_Cobro > -1) ? row[idxF_Cobro] : '';
-              allRelevantInvoices.push({
-                  rawRow: row,
-                  fechaFactura: parseDateServer(fechaFacturaStr),
-                  fechaCobro: parseDateServer(fechaCobroStr),
-                  monto: (idxF_Monto > -1) ? parseMoneyServer(row[idxF_Monto]) : 0,
-                  razonSocial: (idxF_OS > -1) ? row[idxF_OS] : 'PARTICULAR',
-                  prestador: rowTerapeuta, 
-                  fechaFacturaStr,
-                  fechaCobroStr,
-                  mes: (idxF_Mes > -1) ? row[idxF_Mes] : '',
-                  nFactura: (idxF_Num > -1) ? row[idxF_Num] : '',
-                  paciente: (idxF_Paciente > -1) ? row[idxF_Paciente] : '',
-                  aprobacion: (idxF_Estado > -1) ? row[idxF_Estado] : ''
-              });
-          }
-
-          const delaysByOS = {};
-          const delaysByPrestadorOS = {};
-          allRelevantInvoices.forEach(inv => {
-              if (inv.fechaCobro && inv.fechaFactura) {
-                   const diffTime = inv.fechaCobro.getTime() - inv.fechaFactura.getTime();
-                   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                   if (diffDays >= 0 && diffDays < 365) {
-                       if (!delaysByOS[inv.razonSocial]) delaysByOS[inv.razonSocial] = { total: 0, count: 0 };
-                       delaysByOS[inv.razonSocial].total += diffDays;
-                       delaysByOS[inv.razonSocial].count += 1;
-                       const keyPrestador = inv.razonSocial + '|' + inv.prestador;
-                       if (!delaysByPrestadorOS[keyPrestador]) delaysByPrestadorOS[keyPrestador] = { total: 0, count: 0 };
-                       delaysByPrestadorOS[keyPrestador].total += diffDays;
-                       delaysByPrestadorOS[keyPrestador].count += 1;
-                   }
-              }
-          });
-
-          const avgDelays = {};
-          for (const os in delaysByOS) avgDelays[os] = Math.round(delaysByOS[os].total / delaysByOS[os].count);
-          const avgDelaysPrestador = {};
-          for (const key in delaysByPrestadorOS) avgDelaysPrestador[key] = Math.round(delaysByPrestadorOS[key].total / delaysByPrestadorOS[key].count);
-          financialStats.avgDelays = avgDelays;
-
-          const mesesNombres = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-          const parseMesAnio = (str) => {
-              str = String(str).toLowerCase().trim();
-              let mIndex = -1;
-              for (let i = 0; i < mesesNombres.length; i++) {
-                 if (str.includes(mesesNombres[i]) || (mesesNombres[i] === 'septiembre' && str.includes('setiembre'))) { mIndex = i; break; }
-              }
-              const anioMatch = str.match(/\d{4}/);
-              if (mIndex > -1 && anioMatch) return new Date(parseInt(anioMatch[0]), mIndex, 1);
-              return null;
-          };
-
-          let uniqueMonthsMap = {};
-          allRelevantInvoices.forEach(inv => {
-             const d = parseMesAnio(inv.mes);
-             if (d) {
-                 const key = d.getTime(); 
-                 if(!uniqueMonthsMap[key]) uniqueMonthsMap[key] = { mes: mesesNombres[d.getMonth()], anio: String(d.getFullYear()), timestamp: key };
-             }
-          });
-
-          let sortedMonths = Object.values(uniqueMonthsMap).sort((a, b) => b.timestamp - a.timestamp);
-          const targets = sortedMonths.slice(0, 3); 
-
-          allRelevantInvoices.forEach(inv => {
-              // 1. Identificamos si la factura es del usuario conectado
-              const invEmail = (idxF_Email > -1 && inv.rawRow[idxF_Email]) ? String(inv.rawRow[idxF_Email]).trim().toLowerCase() : '';
-              const myEmail = userEmail.toLowerCase();
-              const myName = String(currentUserInfo.nombre).trim().toLowerCase();
-              const isMyInvoice = (invEmail === myEmail || inv.prestador.toLowerCase() === myName);
-
-              // 2. Solo sumamos plata e inflamos gráficos si la factura ME pertenece
-              if (isMyInvoice) {
-                  // Lógica del gráfico de barras mensual
-                  const mesStr = String(inv.mes).trim().toLowerCase();
-                  const coincide = (texto, target) => {
-                      const tieneMes = (target.mes === 'septiembre') ? (texto.includes('septiembre') || texto.includes('setiembre')) : texto.includes(target.mes);
-                      return tieneMes && texto.includes(target.anio);
-                  };
-
-                  if (targets.length > 0 && coincide(mesStr, targets[0])) financialStats.monthlyBilling[0] += inv.monto;
-                  else if (targets.length > 1 && coincide(mesStr, targets[1])) financialStats.monthlyBilling[1] += inv.monto;
-                  else if (targets.length > 2 && coincide(mesStr, targets[2])) financialStats.monthlyBilling[2] += inv.monto;
-
-                  // Lógica de Ingresos Estimados (Mes actual)
-                  let estimatedDate = null;
-                  let addToCurrentMonth = false;
-
-                  if (inv.fechaCobro) {
-                      estimatedDate = inv.fechaCobro;
-                      if (estimatedDate.getMonth() === currentMonth && estimatedDate.getFullYear() === currentYear) addToCurrentMonth = true;
-                  } else if (inv.fechaFactura) {
-                      const keyPrestador = inv.razonSocial + '|' + inv.prestador;
-                      let demoraReal = undefined;
-                      if (avgDelaysPrestador[keyPrestador] !== undefined) demoraReal = avgDelaysPrestador[keyPrestador];
-                      else if (avgDelays[inv.razonSocial] !== undefined) demoraReal = avgDelays[inv.razonSocial];
-
-                      if (demoraReal !== undefined) {
-                          estimatedDate = new Date(inv.fechaFactura);
-                          estimatedDate.setDate(estimatedDate.getDate() + demoraReal + 5); 
-                          const endOfCurrentMonth = new Date(currentYear, currentMonth + 1, 0); 
-                          if (estimatedDate <= endOfCurrentMonth) addToCurrentMonth = true;
-                      }
-                  }
-                  
-                  if (addToCurrentMonth) {
-                       financialStats.estimatedIncome += inv.monto;
-                       
-                       // Desglose de ingresos (Solo mostramos la OS, ya que todas son mías)
-                       const breakdownKey = inv.razonSocial;
-                       if(!financialStats.breakdown[breakdownKey]) financialStats.breakdown[breakdownKey] = 0;
-                       financialStats.breakdown[breakdownKey] += inv.monto;
-                  }
-              }
-          });
-
-          allRelevantInvoices.sort((a, b) => {
-              if(!a.fechaFactura) return 1; if(!b.fechaFactura) return -1;
-              return b.fechaFactura - a.fechaFactura;
-          });
-
-          facturasList = allRelevantInvoices.slice(0, 500).map(inv => ({
-             paciente: inv.paciente, razonSocial: inv.razonSocial, mes: inv.mes, facturacion: inv.monto, fechaFactura: inv.fechaFacturaStr, nFactura: inv.nFactura, fechaCobro: inv.fechaCobroStr, aprobacion: inv.aprobacion
-          }));
-      }
-    }
-    
     // --- 4. NOTIFICACIONES ---
     let notificaciones = [];
     const sheetNotif = ss.getSheetByName(NOMBRE_HOJA_NOTIFICACIONES);
@@ -803,9 +635,9 @@ function normStr(str) {
 
 function guardarDocumentoClinico(payload) {
   try {
-    let cleanId = String(payload.idDrive).trim();
-    if(cleanId.includes('drive.google.com')) { const match = cleanId.match(/[-\w]{25,}/); if(match) cleanId = match[0]; }
-    const patientFolder = DriveApp.getFolderById(cleanId);
+    const resCarpeta = resolverCarpetaPaciente(payload.idDrive, payload.paciente);
+    const patientFolder = resCarpeta.folder;
+    let cleanId = resCarpeta.id;
     
     const anioActual = String(new Date().getFullYear());
     let yearFolder; const yfs = patientFolder.getFoldersByName(anioActual);
@@ -916,7 +748,7 @@ function guardarDocumentoClinico(payload) {
     
     const newDoc = { fecha: fechaDoc, tipo: payload.tipo, especialidad: payload.especialidad, paciente: payload.paciente, prestador: payload.prestador, url: newFile.getUrl() };
     
-    return { success: true, url: newFile.getUrl(), doc: newDoc };
+    return { success: true, url: newFile.getUrl(), doc: newDoc, idDriveActualizado: resCarpeta.corregido ? resCarpeta.id : null };
   } catch(e) { return { error: e.message }; }
 }
 
@@ -937,12 +769,9 @@ function guardarConfigOS(osHabilitadas) {
 
 function subirInformePropio(payload) {
   try {
-    let cleanId = String(payload.idDrive).trim();
-    if(cleanId.includes('drive.google.com')) { 
-        const match = cleanId.match(/[-\w]{25,}/); 
-        if(match) cleanId = match[0]; 
-    }
-    const patientFolder = DriveApp.getFolderById(cleanId);
+    const resCarpeta = resolverCarpetaPaciente(payload.idDrive, payload.paciente);
+    const patientFolder = resCarpeta.folder;
+    let cleanId = resCarpeta.id;
     
     const anioActual = String(new Date().getFullYear());
     let yearFolder; 
@@ -1014,7 +843,7 @@ function subirInformePropio(payload) {
         sheetDocs.appendRow([Utilities.getUuid(), fechaDoc, tipoInformeGuar, payload.especialidad, payload.paciente, payload.prestador, newFile.getUrl(), ""]);
     }
     
-    return { success: true, doc: { fecha: fechaDoc, tipo: tipoInformeGuar, especialidad: payload.especialidad, paciente: payload.paciente, prestador: payload.prestador, url: newFile.getUrl() } };
+    return { success: true, idDriveActualizado: resCarpeta.corregido ? resCarpeta.id : null, doc: { fecha: fechaDoc, tipo: tipoInformeGuar, especialidad: payload.especialidad, paciente: payload.paciente, prestador: payload.prestador, url: newFile.getUrl() } };
   } catch(e) { 
     return { error: e.message }; 
   }
@@ -1072,19 +901,10 @@ function getUltimoInforme(paciente, prestador, especialidad, tipo) {
 
     const isInforme = String(tipo).startsWith("Informe");
     const pacTarget = normStr(paciente);
-    const basePacTarget = pacTarget ? pacTarget.split('_')[0].trim() : "";
     const presTarget = normStr(prestador);
     const espTarget = normStr(especialidad);
 
-    function matchPac(p1) {
-      if (!p1 || !pacTarget) return false;
-      if (p1 === pacTarget) return true;
-      const b1 = p1.split('_')[0].trim();
-      return (b1 && basePacTarget && b1 === basePacTarget && b1.length >= 3);
-    }
-
     let docEncontradoSinTexto = false;
-    // 1. Prioridad: mismo prestador Y misma prestación (especialidad) con HTML
     for (let i = dataDocs.length - 1; i >= 1; i--) {
         const rowTipo = String(dataDocs[i][2] || "").trim();
         const rowEsp = normStr(dataDocs[i][3]);
@@ -1094,9 +914,9 @@ function getUltimoInforme(paciente, prestador, especialidad, tipo) {
 
         const tipoCoincide = isInforme ? rowTipo.startsWith("Informe") : (rowTipo === tipo);
         const matchPres = presTarget ? (rowPres === presTarget) : false;
-        const matchEsp = (espTarget && espTarget !== "GENERAL") ? (rowEsp === espTarget) : true;
+        const matchEsp = (rowEsp === espTarget || !espTarget || espTarget === "GENERAL" || rowEsp === "GENERAL");
         
-        if (matchPac(rowPac) && tipoCoincide && matchPres && matchEsp) {
+        if (rowPac === pacTarget && tipoCoincide && (matchPres || matchEsp)) {
             if (htmlGuardado && String(htmlGuardado).trim() !== "") {
                 return { success: true, html: htmlGuardado };
             } else {
@@ -1104,28 +924,6 @@ function getUltimoInforme(paciente, prestador, especialidad, tipo) {
             }
         }
     }
-
-    // 2. Si no encontró por prestador exacto, buscar por misma especialidad
-    if (espTarget && espTarget !== "GENERAL") {
-        for (let i = dataDocs.length - 1; i >= 1; i--) {
-            const rowTipo = String(dataDocs[i][2] || "").trim();
-            const rowEsp = normStr(dataDocs[i][3]);
-            const rowPac = normStr(dataDocs[i][4]);
-            const htmlGuardado = dataDocs[i][7];
-
-            const tipoCoincide = isInforme ? rowTipo.startsWith("Informe") : (rowTipo === tipo);
-            const matchEsp = (rowEsp === espTarget);
-            
-            if (matchPac(rowPac) && tipoCoincide && matchEsp) {
-                if (htmlGuardado && String(htmlGuardado).trim() !== "") {
-                    return { success: true, html: htmlGuardado };
-                } else {
-                    docEncontradoSinTexto = true;
-                }
-            }
-        }
-    }
-
     if (docEncontradoSinTexto) {
         return { success: false, sinTexto: true, message: "El informe anterior está registrado en Drive, pero fue subido directamente en formato PDF sin borrador de texto editable en la planilla." };
     }
@@ -1133,4 +931,317 @@ function getUltimoInforme(paciente, prestador, especialidad, tipo) {
   } catch (e) {
     return { error: e.message };
   }
+}
+
+
+function getFacturasData(tokenDelFrontend) {
+  try {
+    let userEmail = "";
+    if (tokenDelFrontend && String(tokenDelFrontend).trim() !== "") {
+      userEmail = obtenerEmailPorToken(tokenDelFrontend);
+      if (!userEmail) throw new Error("Acceso denegado: Token inválido.");
+    } else {
+      const rawSessionEmail = Session.getActiveUser().getEmail();
+      userEmail = rawSessionEmail ? String(rawSessionEmail).trim().toLowerCase() : "";
+      if (!userEmail) throw new Error("Acceso denegado: No identificado.");
+    }
+
+    const isSecretaria = SECRETARIA_EMAILS.some(e => e.trim().toLowerCase() === userEmail);
+    const isAdmin = ADMIN_EMAILS.some(e => e.trim().toLowerCase() === userEmail) || isSecretaria;
+
+    // Si es Administrador o Secretaría, NO realiza ningún cálculo de KPI estadístico
+    if (isAdmin) {
+      return {
+        facturas: [],
+        financialStats: { estimatedIncome: 0, monthlyBilling: [0, 0, 0], breakdown: {}, avgDelays: {} }
+      };
+    }
+
+    const ss = SpreadsheetApp.openById(ID_PLANILLA);
+    let userName = "";
+    const sheetDatos = ss.getSheetByName(NOMBRE_HOJA_DATOS);
+    if (sheetDatos) {
+      const lastRowD = sheetDatos.getLastRow();
+      if (lastRowD > 1) {
+        const dDatos = sheetDatos.getRange(1, 1, lastRowD, sheetDatos.getLastColumn()).getDisplayValues();
+        const hD = dDatos[0];
+        const idxEmail = getColIndex(hD, ["E-MAIL", "EMAIL"]);
+        const idxPres = getColIndex(hD, ["PRESTADOR"]);
+        if (idxEmail > -1 && idxPres > -1) {
+          const uRow = dDatos.slice(1).find(r => r[idxEmail] && String(r[idxEmail]).trim().toLowerCase() === userEmail.toLowerCase());
+          if (uRow && uRow[idxPres]) userName = String(uRow[idxPres]).trim();
+        }
+      }
+    }
+
+    let facturasList = [];
+    let financialStats = { estimatedIncome: 0, monthlyBilling: [0, 0, 0], breakdown: {}, avgDelays: {} };
+
+    const sheetFacturas = ss.getSheetByName(NOMBRE_HOJA_FACTURAS);
+    if (sheetFacturas) {
+      const lastRowF = sheetFacturas.getLastRow();
+      if (lastRowF > 1) {
+        const dataF = sheetFacturas.getRange(1, 1, lastRowF, sheetFacturas.getLastColumn()).getDisplayValues();
+        const hF = dataF[0];
+        const idxF_Email = getColIndex(hF, ["E-MAIL", "EMAIL"]);
+        const idxF_Terapeuta = getColIndex(hF, ["TERAPEUTA", "PROFESIONAL", "PRESTADOR"]);
+        const idxF_Paciente = getColIndex(hF, ["PACIENTE"]);
+        const idxF_OS = getColIndex(hF, ["RAZON SOCIAL", "OBRA SOCIAL"]);
+        const idxF_Mes = getColIndex(hF, ["MES"]);
+        const idxF_Monto = getColIndex(hF, ["FACTURACION", "IMPORTE"]);
+        const idxF_Fecha = getColIndex(hF, ["FECHA DE FACTURA", "FECHA FACTURA"]);
+        const idxF_Num = getColIndex(hF, ["N° FACTURA", "NUMERO", "FACTURA"]);
+        const idxF_Cobro = getColIndex(hF, ["FECHA DE COBRO", "FECHA COBRO"]);
+        const idxF_Estado = getColIndex(hF, ["APROBACIÓN", "ESTADO"]);
+
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        let allRelevantInvoices = [];
+
+        for (let i = 1; i < dataF.length; i++) {
+          const row = dataF[i];
+          if (row.join("").trim() === "") continue;
+
+          const rowTerapeuta = (idxF_Terapeuta > -1 && row[idxF_Terapeuta]) ? String(row[idxF_Terapeuta]).trim() : "Sin Nombre";
+          const rowEmail = (idxF_Email > -1 && row[idxF_Email]) ? String(row[idxF_Email]).trim().toLowerCase() : "";
+          const myEmail = userEmail.toLowerCase();
+          const myName = userName.toLowerCase();
+
+          const esPropio = (rowEmail === myEmail || (myName && rowTerapeuta.toLowerCase() === myName));
+          if (!esPropio) continue;
+
+          const fechaFacturaStr = (idxF_Fecha > -1) ? row[idxF_Fecha] : "";
+          const fechaCobroStr = (idxF_Cobro > -1) ? row[idxF_Cobro] : "";
+          allRelevantInvoices.push({
+            rawRow: row,
+            fechaFactura: parseDateServer(fechaFacturaStr),
+            fechaCobro: parseDateServer(fechaCobroStr),
+            monto: (idxF_Monto > -1) ? parseMoneyServer(row[idxF_Monto]) : 0,
+            razonSocial: (idxF_OS > -1) ? row[idxF_OS] : "PARTICULAR",
+            prestador: rowTerapeuta,
+            fechaFacturaStr,
+            fechaCobroStr,
+            mes: (idxF_Mes > -1) ? row[idxF_Mes] : "",
+            nFactura: (idxF_Num > -1) ? row[idxF_Num] : "",
+            paciente: (idxF_Paciente > -1) ? row[idxF_Paciente] : "",
+            aprobacion: (idxF_Estado > -1) ? row[idxF_Estado] : ""
+          });
+        }
+
+        const delaysByOS = {};
+        const delaysByPrestadorOS = {};
+        allRelevantInvoices.forEach(inv => {
+          if (inv.fechaCobro && inv.fechaFactura) {
+            const diffTime = inv.fechaCobro.getTime() - inv.fechaFactura.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays >= 0 && diffDays < 365) {
+              if (!delaysByOS[inv.razonSocial]) delaysByOS[inv.razonSocial] = { total: 0, count: 0 };
+              delaysByOS[inv.razonSocial].total += diffDays;
+              delaysByOS[inv.razonSocial].count += 1;
+              const keyPrestador = inv.razonSocial + "|" + inv.prestador;
+              if (!delaysByPrestadorOS[keyPrestador]) delaysByPrestadorOS[keyPrestador] = { total: 0, count: 0 };
+              delaysByPrestadorOS[keyPrestador].total += diffDays;
+              delaysByPrestadorOS[keyPrestador].count += 1;
+            }
+          }
+        });
+
+        const avgDelays = {};
+        for (const os in delaysByOS) avgDelays[os] = Math.round(delaysByOS[os].total / delaysByOS[os].count);
+        const avgDelaysPrestador = {};
+        for (const key in delaysByPrestadorOS) avgDelaysPrestador[key] = Math.round(delaysByPrestadorOS[key].total / delaysByPrestadorOS[key].count);
+        financialStats.avgDelays = avgDelays;
+
+        const mesesNombres = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+        const parseMesAnio = (str) => {
+          str = String(str).toLowerCase().trim();
+          let mIndex = -1;
+          for (let i = 0; i < mesesNombres.length; i++) {
+            if (str.includes(mesesNombres[i]) || (mesesNombres[i] === "septiembre" && str.includes("setiembre"))) { mIndex = i; break; }
+          }
+          const anioMatch = str.match(/\d{4}/);
+          if (mIndex > -1 && anioMatch) return new Date(parseInt(anioMatch[0]), mIndex, 1);
+          return null;
+        };
+
+        let uniqueMonthsMap = {};
+        allRelevantInvoices.forEach(inv => {
+          const d = parseMesAnio(inv.mes);
+          if (d) {
+            const key = d.getTime();
+            if (!uniqueMonthsMap[key]) uniqueMonthsMap[key] = { mes: mesesNombres[d.getMonth()], anio: String(d.getFullYear()), timestamp: key };
+          }
+        });
+
+        let sortedMonths = Object.values(uniqueMonthsMap).sort((a, b) => b.timestamp - a.timestamp);
+        const targets = sortedMonths.slice(0, 3);
+
+        allRelevantInvoices.forEach(inv => {
+          const mesStr = String(inv.mes).trim().toLowerCase();
+          const coincide = (texto, target) => {
+            const tieneMes = (target.mes === "septiembre") ? (texto.includes("septiembre") || texto.includes("setiembre")) : texto.includes(target.mes);
+            return tieneMes && texto.includes(target.anio);
+          };
+
+          if (targets.length > 0 && coincide(mesStr, targets[0])) financialStats.monthlyBilling[0] += inv.monto;
+          else if (targets.length > 1 && coincide(mesStr, targets[1])) financialStats.monthlyBilling[1] += inv.monto;
+          else if (targets.length > 2 && coincide(mesStr, targets[2])) financialStats.monthlyBilling[2] += inv.monto;
+
+          let estimatedDate = null;
+          let addToCurrentMonth = false;
+
+          if (inv.fechaCobro) {
+            estimatedDate = inv.fechaCobro;
+            if (estimatedDate.getMonth() === currentMonth && estimatedDate.getFullYear() === currentYear) addToCurrentMonth = true;
+          } else if (inv.fechaFactura) {
+            const keyPrestador = inv.razonSocial + "|" + inv.prestador;
+            let demoraReal = undefined;
+            if (avgDelaysPrestador[keyPrestador] !== undefined) demoraReal = avgDelaysPrestador[keyPrestador];
+            else if (avgDelays[inv.razonSocial] !== undefined) demoraReal = avgDelays[inv.razonSocial];
+
+            if (demoraReal !== undefined) {
+              estimatedDate = new Date(inv.fechaFactura);
+              estimatedDate.setDate(estimatedDate.getDate() + demoraReal + 5);
+              const endOfCurrentMonth = new Date(currentYear, currentMonth + 1, 0);
+              if (estimatedDate <= endOfCurrentMonth) addToCurrentMonth = true;
+            }
+          }
+
+          if (addToCurrentMonth) {
+            financialStats.estimatedIncome += inv.monto;
+            const breakdownKey = inv.razonSocial;
+            if (!financialStats.breakdown[breakdownKey]) financialStats.breakdown[breakdownKey] = 0;
+            financialStats.breakdown[breakdownKey] += inv.monto;
+          }
+        });
+
+        allRelevantInvoices.sort((a, b) => {
+          if (!a.fechaFactura) return 1; if (!b.fechaFactura) return -1;
+          return b.fechaFactura - a.fechaFactura;
+        });
+
+        facturasList = allRelevantInvoices.slice(0, 500).map(inv => ({
+          paciente: inv.paciente, razonSocial: inv.razonSocial, mes: inv.mes, facturacion: inv.monto, fechaFactura: inv.fechaFacturaStr, nFactura: inv.nFactura, fechaCobro: inv.fechaCobroStr, aprobacion: inv.aprobacion
+        }));
+      }
+    }
+
+    return {
+      facturas: facturasList,
+      financialStats: financialStats
+    };
+  } catch (e) {
+    console.error("Error en getFacturasData:", e);
+    return { facturas: [], financialStats: { estimatedIncome: 0, monthlyBilling: [0, 0, 0], breakdown: {}, avgDelays: {} } };
+  }
+}
+
+function coincideNombrePacienteConCarpeta(nombrePaciente, nombreCarpeta) {
+  if (!nombrePaciente || !nombreCarpeta) return false;
+  const pNorm = normStr(nombrePaciente);
+  const cNorm = normStr(nombreCarpeta);
+  if (pNorm === cNorm) return true;
+  if (cNorm.includes(pNorm) || pNorm.includes(cNorm)) return true;
+
+  const pBase = pNorm.split("_")[0].trim();
+  const cBase = cNorm.split("_")[0].trim();
+  if (pBase && cBase && (pBase === cBase || cNorm.includes(pBase) || pNorm.includes(cBase))) {
+    return true;
+  }
+  return false;
+}
+
+function resolverCarpetaPaciente(idDrive, nombrePaciente) {
+  let cleanId = String(idDrive || "").trim();
+  if (cleanId.includes("drive.google.com")) {
+    const match = cleanId.match(/[-\w]{25,}/);
+    if (match) cleanId = match[0];
+  }
+
+  let carpetaValida = null;
+  let huboCorreccion = false;
+
+  // 1. Verificamos si el ID recibido es válido y su carpeta en Drive coincide con el paciente
+  if (cleanId && cleanId.length > 5) {
+    try {
+      const folderActual = DriveApp.getFolderById(cleanId);
+      if (coincideNombrePacienteConCarpeta(nombrePaciente, folderActual.getName())) {
+        carpetaValida = folderActual;
+      }
+    } catch (e) {
+      // El ID no existe en Drive o es inaccesible
+    }
+  }
+
+  // 2. Si no coincidía o el ID no era válido, buscamos directamente en la raíz de pacientes por nombre
+  if (!carpetaValida) {
+    const rootFolder = DriveApp.getFolderById(ID_CARPETA_RAIZ_PACIENTES);
+
+    // Intento A: Nombre exacto
+    let iter = rootFolder.getFoldersByName(nombrePaciente);
+    if (iter.hasNext()) {
+      carpetaValida = iter.next();
+      huboCorreccion = true;
+    } else {
+      // Intento B: Si tiene sufijo (ej: PACIENTE_OS), buscamos por el nombre base
+      const partes = nombrePaciente.split("_");
+      if (partes.length > 1 && partes[0].trim().length > 3) {
+        let iterBase = rootFolder.getFoldersByName(partes[0].trim());
+        if (iterBase.hasNext()) {
+          carpetaValida = iterBase.next();
+          huboCorreccion = true;
+        }
+      }
+    }
+
+    // Intento C: Búsqueda recorriendo subcarpetas de la raíz
+    if (!carpetaValida) {
+      const allSub = rootFolder.getFolders();
+      while (allSub.hasNext()) {
+        const sub = allSub.next();
+        if (coincideNombrePacienteConCarpeta(nombrePaciente, sub.getName())) {
+          carpetaValida = sub;
+          huboCorreccion = true;
+          break;
+        }
+      }
+    }
+
+    // Si encontramos la carpeta correcta por búsqueda, actualizamos la celda en la hoja Datos
+    if (carpetaValida && huboCorreccion) {
+      try {
+        const ss = SpreadsheetApp.openById(ID_PLANILLA);
+        const sheet = ss.getSheetByName(NOMBRE_HOJA_DATOS);
+        if (sheet) {
+          const data = sheet.getDataRange().getValues();
+          const headers = data[0];
+          const colPac = getColIndex(headers, ["PACIENTE_OS", "PACIENTE"]);
+          const colId = getColIndex(headers, ["ID DRIVE", "ID_DRIVE"]);
+          if (colPac > -1 && colId > -1) {
+            const pacK = normStr(nombrePaciente);
+            for (let i = 1; i < data.length; i++) {
+              if (normStr(data[i][colPac]) === pacK) {
+                sheet.getRange(i + 1, colId + 1).setValue(carpetaValida.getId());
+                break;
+              }
+            }
+          }
+        }
+      } catch (errSync) {
+        console.error("Error al corregir ID DRIVE en hoja Datos:", errSync);
+      }
+    }
+  }
+
+  // 3. Si definitivamente no existe en Google Drive, abortamos para proteger datos
+  if (!carpetaValida) {
+    throw new Error(
+      "ALERTA DE SEGURIDAD: La carpeta en Google Drive para el paciente \"" + nombrePaciente + "\" " +
+      "no coincide con el ID registrado y tampoco fue encontrada en la carpeta raíz de pacientes. " +
+      "Se canceló el guardado para evitar cruce de informes."
+    );
+  }
+
+  return { folder: carpetaValida, id: carpetaValida.getId(), corregido: huboCorreccion };
 }
